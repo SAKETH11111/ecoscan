@@ -345,7 +345,15 @@ const ResourcesScreen: React.FC = () => {
               { width: width - 40 }, // Ensure correct width
             ]}
           >
-            <RecyclingMap height={200} showUserLocation={true} />
+            <RecyclingMap
+              apiKey="YOUR_GOOGLE_PLACES_API_KEY"
+              searchRadius={5000}
+              height={400}
+              showUserLocation={true}
+              onLocationPress={(location) =>
+                console.log("Selected location:", location)
+              }
+            />
           </View>
         </View>
 
