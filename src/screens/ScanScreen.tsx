@@ -109,8 +109,6 @@ const ScanScreen: React.FC = () => {
 
   // Initialize animations
   useEffect(() => {
-    // --- Temporarily comment out effect body for debugging ---
-    /*
     // Start pulsing animation for scan button
     startPulseAnimation();
     
@@ -127,8 +125,6 @@ const ScanScreen: React.FC = () => {
       // Clean up animations
       cancelAnimation(pulseValue);
     };
-    */
-    // --- End temporary comment out ---
   }, []);
 
   // Pulse animation for scan button
@@ -978,6 +974,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 16,
     fontWeight: "500",
+  },
+  newScanButton: {
+    marginTop: 20,
+    width: "90%",
   },
 });
 

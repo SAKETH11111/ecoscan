@@ -372,18 +372,17 @@ const darkMapStyle = [
   },
 ];
 
-// Define types
-interface RecyclingLocation {
+// Type definitions
+export interface RecyclingLocation {
   id: string;
   coordinate: {
     latitude: number;
     longitude: number;
   };
-  title: string;
-  description: string;
+  name: string;
+  distance?: string;
   type: "recycling" | "store" | "e-waste" | "composting";
-  distance?: number; // Distance from user in meters
-  address?: string; // Location address
+  address?: string; // Optional location address
 }
 
 interface RecyclingMapProps {
@@ -393,6 +392,8 @@ interface RecyclingMapProps {
   showUserLocation?: boolean;
   apiKey?: string; // Google Places API key
   searchRadius?: number; // Search radius in meters
+  locations?: RecyclingLocation[]; // Pass locations directly
+  filter?: string | null; // Filter for location types
 }
 
 const RecyclingMap: React.FC<RecyclingMapProps> = ({
@@ -402,8 +403,10 @@ const RecyclingMap: React.FC<RecyclingMapProps> = ({
   showUserLocation = true,
   apiKey = "", // You'll need to provide a Google Places API key
   searchRadius = 5000, // Default 5km radius
+  locations = [], // Receive locations from props
+  filter = null, // Filter for location types
 }) => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [region, setRegion] = useState<Region>({
@@ -424,45 +427,7 @@ const RecyclingMap: React.FC<RecyclingMapProps> = ({
   const markerRefs = useRef<{ [key: string]: MapMarker | null }>({});
 
   // State for recycling locations
-  const [recyclingLocations, setRecyclingLocations] = useState<
-    RecyclingLocation[]
-  >([
-    {
-      id: "1",
-      coordinate: { latitude: 37.78925, longitude: -122.4344 },
-      title: "City Recycling Center",
-      description: "Full-service recycling facility",
-      type: "recycling",
-    },
-    {
-      id: "2",
-      coordinate: { latitude: 37.78525, longitude: -122.4304 },
-      title: "Green Earth Disposal",
-      description: "Specialized in electronics recycling",
-      type: "e-waste",
-    },
-    {
-      id: "3",
-      coordinate: { latitude: 37.78625, longitude: -122.4254 },
-      title: "EcoMarket",
-      description: "Eco-friendly products and recycling drop-off",
-      type: "store",
-    },
-    {
-      id: "4",
-      coordinate: { latitude: 37.79025, longitude: -122.4374 },
-      title: "Electronic Waste Depot",
-      description: "E-waste collection and processing",
-      type: "e-waste",
-    },
-    {
-      id: "5",
-      coordinate: { latitude: 37.77925, longitude: -122.4294 },
-      title: "Community Compost Center",
-      description: "Drop off organic waste for composting",
-      type: "composting",
-    },
-  ]);
+  const [recyclingLocations, setRecyclingLocations] = useState<RecyclingLocation[]>([]);
 
   // Active filter for location types
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -538,11 +503,40 @@ const RecyclingMap: React.FC<RecyclingMapProps> = ({
     })();
   }, [initialRegion]);
 
+  // Update locations when props change
+  useEffect(() => {
+    if (locations && locations.length > 0) {
+      setRecyclingLocations(locations);
+      
+      // Fit map to show all locations if there's a map ref
+      if (mapRef.current && locations.length > 0) {
+        setTimeout(() => {
+          try {
+            mapRef.current?.fitToCoordinates(
+              locations.map(loc => loc.coordinate),
+              {
+                edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+                animated: true
+              }
+            );
+          } catch (error) {
+            console.error('Error fitting map to coordinates:', error);
+          }
+        }, 500);
+      }
+    }
+  }, [locations]);
+
   // Update recycling locations near the user
   const updateRecyclingLocationsNearUser = (
     latitude: number,
     longitude: number
   ) => {
+    // If locations are provided via props, use those instead of fetching
+    if (locations && locations.length > 0) {
+      return;
+    }
+    
     // If API key is provided, try to fetch real recycling centers
     if (apiKey) {
       fetchNearbyRecyclingCenters(latitude, longitude);
@@ -609,19 +603,20 @@ const RecyclingMap: React.FC<RecyclingMapProps> = ({
           latitude: latitude + latOffset,
           longitude: longitude + lngOffset,
         },
-        title: name,
-        description: `${
-          locType.charAt(0).toUpperCase() + locType.slice(1)
-        } facility near you`,
+        name: name,
         type: locType,
-        distance: distance,
+        distance: distance.toString(),
       };
 
       newLocations.push(newLocation);
     }
 
     // Sort by distance
-    newLocations.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+    newLocations.sort((a, b) => {
+      const distanceA = typeof a.distance === 'string' ? parseFloat(a.distance) : (a.distance || 0);
+      const distanceB = typeof b.distance === 'string' ? parseFloat(b.distance) : (b.distance || 0);
+      return distanceA - distanceB;
+    });
 
     setRecyclingLocations(newLocations);
   };
@@ -689,11 +684,9 @@ const RecyclingMap: React.FC<RecyclingMapProps> = ({
                 latitude: place.geometry.location.lat,
                 longitude: place.geometry.location.lng,
               },
-              title: place.name,
-              description: place.vicinity || "Recycling location",
-              address: place.vicinity,
+              name: place.name,
               type: locationType,
-              distance: distance,
+              distance: distance.toString(),
             };
           });
 
@@ -708,7 +701,11 @@ const RecyclingMap: React.FC<RecyclingMapProps> = ({
       );
 
       // Sort by distance
-      uniqueLocations.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+      uniqueLocations.sort((a, b) => {
+        const distanceA = typeof a.distance === 'string' ? parseFloat(a.distance) : (a.distance || 0);
+        const distanceB = typeof b.distance === 'string' ? parseFloat(b.distance) : (b.distance || 0);
+        return distanceA - distanceB;
+      });
 
       setRecyclingLocations(uniqueLocations);
     } catch (error) {
@@ -747,15 +744,14 @@ const RecyclingMap: React.FC<RecyclingMapProps> = ({
 
   // Generate mock data if API key is not provided
   const generateMockData = (latitude: number, longitude: number) => {
-    const mockLocations: RecyclingLocation[] = [
+    const mockData: RecyclingLocation[] = [
       {
         id: "1",
         coordinate: {
           latitude: latitude + (Math.random() - 0.5) * 0.02,
           longitude: longitude + (Math.random() - 0.5) * 0.02,
         },
-        title: "City Recycling Center",
-        description: "Full-service recycling facility",
+        name: "City Recycling Center",
         type: "recycling",
       },
       {
@@ -764,8 +760,7 @@ const RecyclingMap: React.FC<RecyclingMapProps> = ({
           latitude: latitude + (Math.random() - 0.5) * 0.02,
           longitude: longitude + (Math.random() - 0.5) * 0.02,
         },
-        title: "Green Earth Disposal",
-        description: "Specialized in electronics recycling",
+        name: "Green Earth Disposal",
         type: "e-waste",
       },
       {
@@ -774,8 +769,7 @@ const RecyclingMap: React.FC<RecyclingMapProps> = ({
           latitude: latitude + (Math.random() - 0.5) * 0.02,
           longitude: longitude + (Math.random() - 0.5) * 0.02,
         },
-        title: "EcoMarket",
-        description: "Eco-friendly products and recycling drop-off",
+        name: "EcoMarket",
         type: "store",
       },
       {
@@ -784,8 +778,7 @@ const RecyclingMap: React.FC<RecyclingMapProps> = ({
           latitude: latitude + (Math.random() - 0.5) * 0.02,
           longitude: longitude + (Math.random() - 0.5) * 0.02,
         },
-        title: "Electronic Waste Depot",
-        description: "E-waste collection and processing",
+        name: "Electronic Waste Depot",
         type: "e-waste",
       },
       {
@@ -794,26 +787,26 @@ const RecyclingMap: React.FC<RecyclingMapProps> = ({
           latitude: latitude + (Math.random() - 0.5) * 0.02,
           longitude: longitude + (Math.random() - 0.5) * 0.02,
         },
-        title: "Community Compost Center",
-        description: "Drop off organic waste for composting",
+        name: "Community Compost Center",
         type: "composting",
       },
     ];
 
-    // Add distance to each location
-    mockLocations.forEach((location) => {
-      location.distance = calculateDistance(
+    // Calculate distance for each location
+    mockData.forEach((location) => {
+      // Convert number to string for distance display
+      const distanceInKm = calculateDistance(
         latitude,
         longitude,
         location.coordinate.latitude,
         location.coordinate.longitude
       );
+      
+      // Assign formatted distance string
+      location.distance = `${distanceInKm.toFixed(1)} km`;
     });
 
-    // Sort by distance
-    mockLocations.sort((a, b) => (a.distance || 0) - (b.distance || 0));
-
-    setRecyclingLocations(mockLocations);
+    setRecyclingLocations(mockData);
   };
 
   // Get marker color based on location type
@@ -915,8 +908,8 @@ const RecyclingMap: React.FC<RecyclingMapProps> = ({
   };
 
   // Get filtered locations
-  const filteredLocations = activeFilter
-    ? recyclingLocations.filter((loc) => loc.type === activeFilter)
+  const filteredLocations = filter
+    ? recyclingLocations.filter((loc) => loc.type === filter)
     : recyclingLocations;
 
   // Error state UI
@@ -973,31 +966,38 @@ const RecyclingMap: React.FC<RecyclingMapProps> = ({
       <MapView
         ref={mapRef}
         style={styles.map}
-        region={region}
         provider={PROVIDER_GOOGLE}
+        initialRegion={
+          initialRegion || {
+            latitude: 37.78825,
+            longitude: -122.4324,
+            latitudeDelta: 0.0922,
+            longitudeDelta: 0.0421,
+          }
+        }
         showsUserLocation={showUserLocation}
         showsMyLocationButton={false}
-        customMapStyle={theme.isDark ? darkMapStyle : lightMapStyle}
+        customMapStyle={isDark ? darkMapStyle : lightMapStyle}
         onRegionChangeComplete={setRegion}
       >
         {filteredLocations.map((location) => (
           <Marker
             key={location.id}
-            ref={(ref) => (markerRefs.current[location.id] = ref)}
             coordinate={location.coordinate}
-            title={location.title}
-            description={location.description}
+            title={location.name}
+            description={location.address || (location.distance ? `${location.distance} away` : '')}
+            pinColor={getMarkerColor(location.type)}
             onPress={() => handleMarkerPress(location)}
           >
             <View
               style={[
-                styles.customMarker,
+                styles.markerContainer,
                 { backgroundColor: getMarkerColor(location.type) },
               ]}
             >
               <Ionicons
                 name={getMarkerIcon(location.type)}
-                size={14}
+                size={16}
                 color="#FFFFFF"
               />
             </View>
@@ -1122,7 +1122,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
   },
-  customMarker: {
+  markerContainer: {
     width: 30,
     height: 30,
     borderRadius: 15,
