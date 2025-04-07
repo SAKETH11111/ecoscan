@@ -8,11 +8,14 @@ import {
   ActivityIndicator,
   Alert,
   StatusBar,
+  Dimensions,
 } from 'react-native';
 import * as Camera from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -20,8 +23,13 @@ import Animated, {
   withSequence,
   withDelay,
   withRepeat,
+  withSpring,
   Easing,
   runOnJS,
+  interpolateColor,
+  FadeIn,
+  FadeOut,
+  cancelAnimation,
 } from 'react-native-reanimated';
 
 // Import components & hooks
@@ -30,13 +38,22 @@ import ScanResultCard from '../components/ScanResultCard';
 import AnimatedButton from '../components/UI/AnimatedButton';
 import { useTheme } from '../context/ThemeContext';
 import { useAppContext } from '../context/AppContext';
-import { useFadeInAnimation, useHapticFeedback } from '../hooks/useAnimations';
+import { 
+  useFadeInAnimation, 
+  useHapticFeedback, 
+  useReanimatedScale,
+  useReanimatedSlide
+} from '../hooks/useAnimations';
 
 // Import services
 import { analyzeImage } from '../api/geminiService';
 
 // Animated components
 const AnimatedSafeAreaView = Animated.createAnimatedComponent(SafeAreaView);
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
+
+const { width, height } = Dimensions.get('window');
 
 interface ScanResult {
   itemName: string;
@@ -52,10 +69,20 @@ interface ScanResult {
 
 const ScanScreen: React.FC = () => {
   // Context & hooks
-  const { theme } = useTheme();
+  const { theme, isDark, themeTransition, toggleTheme } = useTheme();
   const { addRecycledItem } = useAppContext();
   const { triggerImpact, triggerNotification } = useHapticFeedback();
   const { fadeAnim, fadeIn, fadeOut } = useFadeInAnimation(300, 1);
+  
+  // Define gradient colors with 'as const'
+  const darkGradientColors = ['#131419', '#1B1D25'] as const;
+  const lightGradientColors = ['#FFFFFF', '#F7FAFC'] as const;
+  // Choose the correct gradient colors based on theme
+  const gradientColors = isDark ? darkGradientColors : lightGradientColors;
+  
+  // Scale animations
+  const { scale: instructionScale, scaleStyle: instructionScaleStyle } = useReanimatedScale(400, 0);
+  const { slideStyle: instructionSlideStyle, slideIn: instructionSlideIn } = useReanimatedSlide('up', 20, 800);
   
   // Use the permissions hook
   const [permission, requestPermission] = Camera.useCameraPermissions();
@@ -72,6 +99,45 @@ const ScanScreen: React.FC = () => {
   const scanButtonScale = useSharedValue(1);
   const cameraGuideScale = useSharedValue(0.9);
   const scanningAnimation = useSharedValue(0);
+  const pulseValue = useSharedValue(1);
+  const themeToggleScale = useSharedValue(1);
+  const themeToggleRotate = useSharedValue(0);
+  
+  // Initialize animations
+  useEffect(() => {
+    // --- Temporarily comment out effect body for debugging ---
+    /*
+    // Start pulsing animation for scan button
+    startPulseAnimation();
+    
+    // Animate instruction text in
+    setTimeout(() => {
+      instructionScale.value = withSpring(1, {
+        damping: 14,
+        stiffness: 100,
+      });
+      instructionSlideIn();
+    }, 500);
+    
+    return () => {
+      // Clean up animations
+      cancelAnimation(pulseValue);
+    };
+    */
+   // --- End temporary comment out ---
+  }, []);
+  
+  // Pulse animation for scan button
+  const startPulseAnimation = () => {
+    pulseValue.value = withRepeat(
+      withSequence(
+        withTiming(1.05, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
+        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.sin) })
+      ),
+      -1, // Infinite repeat
+      true // Reverse
+    );
+  };
   
   // Start scanning frame animation
   const startScanningAnimation = () => {
@@ -184,7 +250,7 @@ const ScanScreen: React.FC = () => {
       
       // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'images',
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -209,13 +275,19 @@ const ScanScreen: React.FC = () => {
       // Analyze image
       const result = await analyzeImage(imageUri);
       
+      // Add the image URI to the result
+      const enhancedResult = {
+        ...result,
+        scannedImageUrl: imageUri
+      };
+      
       // Update user data if recyclable
       if (result.recyclable) {
         addRecycledItem(result);
       }
       
       // Update state with result
-      setScanResult(result);
+      setScanResult(enhancedResult);
       
     } catch (error) {
       console.error('Error analyzing image:', error);
@@ -276,11 +348,11 @@ const ScanScreen: React.FC = () => {
   
   // Scan button animation
   const scanButtonAnimStyle = useAnimatedStyle(() => {
-    // Compute primitive value for transform
-    const scale = scanButtonScale.value;
-    
+    // Combine manual scale and pulse animations
     return {
-      transform: [{ scale }],
+      transform: [
+        { scale: scanButtonScale.value * pulseValue.value }
+      ],
     };
   });
   
@@ -300,6 +372,44 @@ const ScanScreen: React.FC = () => {
       opacity: fadeAnim.value, // fadeAnim is the shared value from useFadeInAnimation
     };
   });
+  
+  // Theme toggle animation
+  const handleThemeToggle = () => {
+    // Trigger haptic feedback
+    triggerImpact('light');
+    
+    // Animate the theme toggle button
+    themeToggleScale.value = withSequence(
+      withTiming(0.8, { duration: 150 }),
+      withSpring(1, { damping: 12 })
+    );
+    
+    // Rotate animation
+    themeToggleRotate.value = withSequence(
+      withTiming(isDark ? -Math.PI : Math.PI, { 
+        duration: 450,
+        easing: Easing.bezier(0.25, 1, 0.5, 1)
+      })
+    );
+    
+    // After animation, reset rotation value
+    setTimeout(() => {
+      themeToggleRotate.value = 0;
+    }, 500);
+    
+    // Toggle theme
+    toggleTheme();
+  };
+  
+  // Theme toggle animation style
+  const themeToggleAnimStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { scale: themeToggleScale.value },
+        { rotate: `${themeToggleRotate.value}rad` }
+      ]
+    };
+  });
 
   // Camera mode UI
   if (cameraMode) {
@@ -311,6 +421,18 @@ const ScanScreen: React.FC = () => {
           ref={cameraRef}
           facing={'back'}
         >
+          {/* Animated scanning mask */}
+          <View style={styles.scanMask}>
+            <View style={styles.scanArea}>
+              <Animated.View style={[styles.scanLine, {
+                transform: [
+                  { translateY: scanningAnimation.value * 280 - 140 }
+                ],
+                opacity: scanningAnimation.value > 0.9 ? 1 - (scanningAnimation.value - 0.9) * 10 : 1
+              }]} />
+            </View>
+          </View>
+          
           {/* Scanning overlay frame */}
           <Animated.View style={[styles.scanningOverlay, scanningAnimStyle]}>
             <View style={styles.scanningFrame} />
@@ -342,6 +464,14 @@ const ScanScreen: React.FC = () => {
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
+          
+          {/* Camera features indicator */}
+          <View style={styles.cameraFeatures}>
+            <View style={styles.cameraFeature}>
+              <Ionicons name="scan" size={20} color="white" />
+              <Text style={styles.cameraFeatureText}>AI Scan</Text>
+            </View>
+          </View>
         </Camera.CameraView>
       </Animated.View>
     );
@@ -358,13 +488,55 @@ const ScanScreen: React.FC = () => {
     >
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
       
+      {/* Simple Gradient Background */}
+      <LinearGradient
+        style={StyleSheet.absoluteFill}
+        colors={gradientColors}
+        start={{x: 0, y: 0}}
+        end={{x: 1, y: 1}}
+      />
+      
       <Animated.View 
         style={[
           styles.content,
-          contentFadeStyle // Use the animated style hook here
+          contentFadeStyle
         ]}
       >
-        <Text style={[styles.title, { color: theme.textPrimary }]}>Scan</Text>
+        {/* Header with title */}
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: theme.textPrimary }]}>Scan</Text>
+          
+          {/* Theme toggle button */}
+          <Animated.View style={themeToggleAnimStyle}>
+            <TouchableOpacity 
+              style={[
+                styles.themeToggle, 
+                { 
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                  borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                  borderWidth: 0.5,
+                }
+              ]}
+              onPress={handleThemeToggle}
+              activeOpacity={0.7}
+            >
+              <Animated.View style={{
+                transform: [{ rotate: `${isDark ? '0deg' : '180deg'}` }],
+                opacity: isDark ? 1 : 0,
+                position: 'absolute',
+              }}>
+                <Ionicons name="sunny-outline" size={20} color={theme.textPrimary} />
+              </Animated.View>
+              <Animated.View style={{
+                transform: [{ rotate: `${isDark ? '180deg' : '0deg'}` }],
+                opacity: isDark ? 0 : 1,
+                position: 'absolute',
+              }}>
+                <Ionicons name="moon-outline" size={20} color={theme.textPrimary} />
+              </Animated.View>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
         
         {/* Initial scan UI */}
         {!previewImage && !scanResult && (
@@ -383,14 +555,52 @@ const ScanScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
             
-            <Text style={[styles.instruction, { color: theme.textSecondary }]}>
-              Point your camera at any item to identify how to recycle it
-            </Text>
+            <Animated.View style={[instructionScaleStyle, instructionSlideStyle]}>
+              <View
+                style={[styles.instructionCard, { 
+                  backgroundColor: isDark ? 'rgba(30,35,45,0.8)' : 'rgba(255,255,255,0.8)',
+                  borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                  borderWidth: 0.5
+                }]}
+              >
+                <View style={styles.instructionIconContainer}>
+                  <MaterialCommunityIcons 
+                    name="recycle" 
+                    size={24} 
+                    color={theme.primary} 
+                  />
+                </View>
+                <Text style={[styles.instruction, { color: theme.textSecondary }]}>
+                  Point your camera at any item to identify how to recycle it
+                </Text>
+              </View>
+            </Animated.View>
+            
+            {/* Categories preview */}
+            <View style={styles.categoriesContainer}>
+              <Text style={[styles.categoriesTitle, { color: theme.textSecondary }]}>
+                Scan to identify:
+              </Text>
+              <View style={styles.categories}>
+                <View style={[styles.categoryBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+                  <MaterialCommunityIcons name="bottle-soda-classic-outline" size={16} color={theme.textSecondary} />
+                  <Text style={[styles.categoryText, { color: theme.textSecondary }]}>Plastic</Text>
+                </View>
+                <View style={[styles.categoryBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+                  <MaterialCommunityIcons name="glass-cocktail" size={16} color={theme.textSecondary} />
+                  <Text style={[styles.categoryText, { color: theme.textSecondary }]}>Glass</Text>
+                </View>
+                <View style={[styles.categoryBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+                  <MaterialCommunityIcons name="newspaper-variant-outline" size={16} color={theme.textSecondary} />
+                  <Text style={[styles.categoryText, { color: theme.textSecondary }]}>Paper</Text>
+                </View>
+              </View>
+            </View>
           </>
         )}
         
         {/* Preview Image */}
-        {previewImage && (
+        {previewImage && !scanResult && (
           <View style={styles.previewContainer}>
             <Image 
               source={{ uri: previewImage }} 
@@ -417,8 +627,12 @@ const ScanScreen: React.FC = () => {
             text="Scan New Item"
             onPress={handleStartScan}
             style={styles.newScanButton}
-            variant="filled"
+            variant="gradient"
             size="medium"
+            gradientColors={isDark 
+              ? ['#4DC1A1', '#3AA183']
+              : ['#3A9B7A', '#2A7459']
+            }
             iconLeft={<Ionicons name="camera-outline" size={20} color="#FFFFFF" />}
           />
         )}
@@ -434,32 +648,93 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 30,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+  },
+  header: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 40,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '700',
-    marginBottom: 40,
-    alignSelf: 'flex-start',
+  },
+  themeToggle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scanButtonContainer: {
     marginTop: 20,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   galleryButton: {
     paddingVertical: 12,
-    marginBottom: 30,
+    marginBottom: 24,
   },
   galleryButtonText: {
     fontSize: 16,
     fontWeight: '500',
   },
+  instructionCard: {
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: 'hidden',
+  },
+  instructionIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(77, 193, 161, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
   instruction: {
-    fontSize: 16,
-    textAlign: 'center',
-    maxWidth: '80%',
+    fontSize: 15,
+    flex: 1,
     lineHeight: 22,
+  },
+  categoriesContainer: {
+    width: '100%',
+    marginTop: 16,
+  },
+  categoriesTitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  categories: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  categoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  categoryText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 6,
   },
   // Camera styles
   cameraContainer: {
@@ -468,6 +743,26 @@ const styles = StyleSheet.create({
   },
   camera: {
     flex: 1,
+  },
+  scanMask: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanArea: {
+    width: 280,
+    height: 280,
+    overflow: 'hidden',
+  },
+  scanLine: {
+    position: 'absolute',
+    width: 280,
+    height: 2,
+    backgroundColor: '#4DC1A1',
+    shadowColor: '#4DC1A1',
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 5,
+    shadowOpacity: 0.7,
   },
   cameraGuide: {
     position: 'absolute',
@@ -488,55 +783,55 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scanningFrame: {
-    width: 250,
-    height: 250,
+    width: 280,
+    height: 280,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 20,
   },
   cornerTL: {
     position: 'absolute',
-    top: '30%',
-    left: '20%',
+    top: height / 2 - 140,
+    left: width / 2 - 140,
     width: 40,
     height: 40,
     borderTopWidth: 4,
     borderLeftWidth: 4,
     borderColor: '#FFFFFF',
-    borderTopLeftRadius: 10,
+    borderTopLeftRadius: 16,
   },
   cornerTR: {
     position: 'absolute',
-    top: '30%',
-    right: '20%',
+    top: height / 2 - 140,
+    right: width / 2 - 140,
     width: 40,
     height: 40,
     borderTopWidth: 4,
     borderRightWidth: 4,
     borderColor: '#FFFFFF',
-    borderTopRightRadius: 10,
+    borderTopRightRadius: 16,
   },
   cornerBL: {
     position: 'absolute',
-    bottom: '30%',
-    left: '20%',
+    bottom: height / 2 - 140,
+    left: width / 2 - 140,
     width: 40,
     height: 40,
     borderBottomWidth: 4,
     borderLeftWidth: 4,
     borderColor: '#FFFFFF',
-    borderBottomLeftRadius: 10,
+    borderBottomLeftRadius: 16,
   },
   cornerBR: {
     position: 'absolute',
-    bottom: '30%',
-    right: '20%',
+    bottom: height / 2 - 140,
+    right: width / 2 - 140,
     width: 40,
     height: 40,
     borderBottomWidth: 4,
     borderRightWidth: 4,
     borderColor: '#FFFFFF',
-    borderBottomRightRadius: 10,
+    borderBottomRightRadius: 16,
   },
   cameraControls: {
     position: 'absolute',
@@ -571,21 +866,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  cameraFeatures: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  cameraFeature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  cameraFeatureText: {
+    color: 'white',
+    marginLeft: 8,
+    fontWeight: '600',
+  },
   // Preview styles
   previewContainer: {
     width: '100%',
-    height: 300,
-    borderRadius: 16,
+    height: 350,
+    borderRadius: 20,
     overflow: 'hidden',
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 8,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
   },
   previewImage: {
     width: '100%',
@@ -593,10 +908,10 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: 20,
   },
   loadingText: {
     color: '#FFFFFF',
