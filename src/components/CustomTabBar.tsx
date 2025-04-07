@@ -1,18 +1,24 @@
-import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, Dimensions } from 'react-native';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import React from "react";
+import {
+  View,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  Dimensions,
+} from "react-native";
+import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
   interpolate,
   Extrapolate,
-} from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../context/ThemeContext';
-import { useHapticFeedback } from '../hooks/useAnimations';
+} from "react-native-reanimated";
+import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
+import { useHapticFeedback } from "../hooks/useAnimations";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 type TabIconProps = {
   name: string;
@@ -23,18 +29,22 @@ type TabIconProps = {
 
 const TabIcon: React.FC<TabIconProps> = ({ name, color, size, focused }) => {
   // When focused, display filled icons, otherwise outline
-  const iconName = `${name}${focused ? '' : '-outline'}`;
-  
+  const iconName = `${name}${focused ? "" : "-outline"}`;
+
   return <Ionicons name={iconName as any} size={size} color={color} />;
 };
 
-const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
+const CustomTabBar: React.FC<BottomTabBarProps> = ({
+  state,
+  descriptors,
+  navigation,
+}) => {
   const { theme } = useTheme();
   const { triggerSelection } = useHapticFeedback();
-  
+
   // Track indicator position for animation
   const indicatorPosition = useSharedValue(0);
-  
+
   // Update indicator position when active tab changes
   React.useEffect(() => {
     const tabWidth = width / state.routes.length;
@@ -50,56 +60,56 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
   });
 
   return (
-    <View 
+    <View
       style={[
-        styles.container, 
-        { 
+        styles.container,
+        {
           backgroundColor: theme.backgroundCard,
           borderTopColor: theme.border,
-        }
+        },
       ]}
     >
       {/* Animated indicator */}
-      <Animated.View 
+      <Animated.View
         style={[
-          styles.indicator, 
-          { 
+          styles.indicator,
+          {
             width: width / state.routes.length,
             backgroundColor: theme.primaryLight,
           },
           indicatorStyle,
-        ]} 
+        ]}
       />
-      
+
       {/* Tab buttons */}
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         const label = options.tabBarLabel || options.title || route.name;
-        
+
         const isFocused = state.index === index;
-        
+
         // Get icon name based on route
         let iconName: string;
         switch (route.name) {
-          case 'Scan':
-            iconName = 'scan';
+          case "Scan":
+            iconName = "scan";
             break;
-          case 'Impact':
-            iconName = 'leaf';
+          case "Impact":
+            iconName = "leaf";
             break;
-          case 'Community':
-            iconName = 'people';
+          case "Community":
+            iconName = "people";
             break;
-          case 'Resources':
-            iconName = 'map';
+          case "Resources":
+            iconName = "map";
             break;
           default:
-            iconName = 'ellipsis-horizontal';
+            iconName = "ellipsis-horizontal";
         }
 
         const onPress = () => {
           const event = navigation.emit({
-            type: 'tabPress',
+            type: "tabPress",
             target: route.key,
             canPreventDefault: true,
           });
@@ -113,18 +123,18 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
 
         const onLongPress = () => {
           navigation.emit({
-            type: 'tabLongPress',
+            type: "tabLongPress",
             target: route.key,
           });
         };
-        
+
         // Scale animation for tab items
         const scale = useSharedValue(isFocused ? 1 : 0.92);
-        
+
         React.useEffect(() => {
           scale.value = withTiming(isFocused ? 1 : 0.92, { duration: 200 });
         }, [isFocused]);
-        
+
         const tabItemStyle = useAnimatedStyle(() => {
           return {
             transform: [{ scale: scale.value }],
@@ -149,19 +159,19 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
             activeOpacity={0.7}
           >
             <Animated.View style={[styles.tabItem, tabItemStyle]}>
-              <TabIcon 
-                name={iconName} 
-                color={isFocused ? theme.primary : theme.textTertiary} 
-                size={24} 
-                focused={isFocused} 
+              <TabIcon
+                name={iconName}
+                color={isFocused ? theme.primary : theme.textTertiary}
+                size={24}
+                focused={isFocused}
               />
-              <Text 
+              <Text
                 style={[
                   styles.tabLabel,
-                  { 
+                  {
                     color: isFocused ? theme.primary : theme.textTertiary,
                     marginTop: 4,
-                  }
+                  },
                 ]}
               >
                 {label as string}
@@ -176,11 +186,11 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
+    flexDirection: "row",
     height: 65,
     borderTopWidth: 1,
     elevation: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: -2,
@@ -189,24 +199,24 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
   indicator: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
-    height: '100%',
+    height: "100%",
     borderRadius: 8,
   },
   tabButton: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   tabItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 8,
   },
   tabLabel: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });
 
