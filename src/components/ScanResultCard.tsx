@@ -28,6 +28,7 @@ import AnimatedProgressBar from './UI/AnimatedProgressBar';
 const { width, height } = Dimensions.get('window');
 // Using regular components instead of animated ones for compatibility
 
+// Define the ScanResult interface based on the JSDoc types in geminiClient.js
 interface ScanResult {
   itemName: string;
   recyclable: boolean;
@@ -39,6 +40,8 @@ interface ScanResult {
     waterSaved: string;
   };
   scannedImageUrl?: string;
+  isMockData?: boolean;
+  errorDetails?: string;
 }
 
 interface ScanResultCardProps {
@@ -68,14 +71,12 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
   const dismissOpacity = useSharedValue(1);
   
   useEffect(() => {
-    // --- Temporarily comment out entire effect body for debugging ---
-    /*
-    if (result) {
+    if (result && result !== localResult) {
       // Trigger success/error haptic feedback based on recyclability
       if (result.recyclable) {
-        runOnJS(triggerNotification)('success');
+        triggerNotification('success');
       } else {
-        runOnJS(triggerNotification)('warning');
+        triggerNotification('warning');
       }
       
       // Reset animation values
@@ -147,8 +148,6 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
       cancelAnimation(impactBarWidth);
       cancelAnimation(waterBarWidth);
     };
-    */
-    // --- End of temporary comment out ---
   }, [result]);
   
   // Shimmer effect animation
@@ -234,11 +233,21 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
     };
   });
 
+  // Store result in state to maintain it during component lifecycle
+  const [localResult, setLocalResult] = useState<ScanResult | null>(null);
+  
+  // Update local state when prop changes
+  useEffect(() => {
+    if (result) {
+      setLocalResult(result);
+    }
+  }, [result]);
+  
   // Skip rendering if no result
-  if (!result) return null;
+  if (!localResult) return null;
 
   // Get status color based on recyclability
-  const statusColor = result.recyclable
+  const statusColor = localResult.recyclable
     ? theme.success
     : theme.warning;
     
@@ -249,13 +258,13 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
   const nonRecyclableColorsLight = ['#fff3e0', '#ffcc80', '#ffa726'] as const;
 
   // Choose the correct static gradient colors based on status and theme
-  const staticGradientColors = result.recyclable
+  const staticGradientColors = localResult.recyclable
     ? (isDark ? recyclableColorsDark : recyclableColorsLight)
     : (isDark ? nonRecyclableColorsDark : nonRecyclableColorsLight);
 
   // Get icon based on material category
   const getCategoryIcon = () => {
-    switch (result.category.toLowerCase()) {
+    switch (localResult.category.toLowerCase()) {
       case 'plastic':
         return <MaterialCommunityIcons name="bottle-soda-classic-outline" size={18} color={isDark ? '#e0e0e0' : '#333'} />;
       case 'glass':
@@ -274,7 +283,7 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
       <Animated.View
         style={[
           styles.outerContainer, 
-          { backgroundColor: theme.backgroundPrimary },
+          { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }, // Solid color for shadow
           cardSwipeStyle, 
           cardScaleStyle
         ]}
@@ -297,20 +306,32 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
             {/* Glass Card UI */}
             <View style={[styles.cardContentWrapper, { 
               borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', 
+              backgroundColor: theme.backgroundSecondary,
             }]}>
             
               {/* Header with close button */}
               <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)' }]}>
                 <Animated.View style={[styles.headerContent, titleScaleStyle]}>
-                  <Text style={[styles.itemName, { color: isDark ? '#ffffff' : '#000000' }]}>
-                    {result.itemName}
-                  </Text>
+                  <View style={styles.itemNameContainer}>
+                    <Text style={[styles.itemName, { color: isDark ? '#ffffff' : '#000000' }]}>
+                      {localResult.itemName}
+                    </Text>
+                    {localResult.isMockData && (
+                      <View style={[styles.mockBadge, { 
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+                      }]}>
+                        <Text style={[styles.mockText, { color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }]}>
+                          Example
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                   <View style={[styles.categoryBadge, { 
                     backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' 
                   }]}>
                     {getCategoryIcon()}
                     <Text style={[styles.categoryText, { color: isDark ? '#e0e0e0' : '#333' }]}>
-                      {result.category}
+                      {localResult.category}
                     </Text>
                   </View>
                 </Animated.View>
@@ -331,9 +352,9 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
               <View style={styles.imageStatusContainer}>
                 {/* Image with overlay */}
                 <View style={styles.imageContainer}>
-                  {result.scannedImageUrl ? (
+                  {localResult.scannedImageUrl ? (
                     <Image 
-                      source={{ uri: result.scannedImageUrl }}
+                      source={{ uri: localResult.scannedImageUrl }}
                       style={styles.scannedImage}
                       resizeMode="cover"
                     />
@@ -353,7 +374,7 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
                 <View style={[
                   styles.statusContainer, 
                   { 
-                    backgroundColor: result.recyclable 
+                    backgroundColor: localResult.recyclable 
                       ? isDark ? 'rgba(0, 170, 70, 0.8)' : 'rgba(0, 180, 80, 0.85)'
                       : isDark ? 'rgba(210, 70, 0, 0.8)' : 'rgba(220, 80, 0, 0.85)'
                   }
@@ -361,19 +382,19 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
                   <View style={styles.statusContent}>
                     <View style={styles.statusIconContainer}>
                       <Ionicons 
-                        name={result.recyclable ? 'checkmark-circle' : 'alert-circle'} 
+                        name={localResult.recyclable ? 'checkmark-circle' : 'alert-circle'} 
                         size={22} 
                         color="white" 
                       />
                     </View>
                     <Text style={styles.statusText}>
-                      {result.recyclable ? 'Recyclable' : 'Not Recyclable'}
+                      {localResult.recyclable ? 'Recyclable' : 'Not Recyclable'}
                     </Text>
                     
                     {/* Recycling code */}
-                    {result.recyclingCode && (
+                    {localResult.recyclingCode && (
                       <View style={styles.recyclingCodeContainer}>
-                        <Text style={styles.recyclingCode}>{result.recyclingCode}</Text>
+                        <Text style={styles.recyclingCode}>{localResult.recyclingCode}</Text>
                       </View>
                     )}
                   </View>
@@ -387,7 +408,13 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
               <ScrollView 
                 style={styles.scrollView} 
                 contentContainerStyle={styles.scrollContainer}
-                showsVerticalScrollIndicator={false}
+                showsVerticalScrollIndicator={true}
+                removeClippedSubviews={false}
+                scrollEventThrottle={16}
+                nestedScrollEnabled={true}
+                persistentScrollbar={true}
+                alwaysBounceVertical={false}
+                bounces={true}
               >
                 {/* Instructions Section */}
                 <View style={styles.sectionContainer}>
@@ -399,13 +426,13 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
                     borderColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)'
                   }]}>
                     <Text style={[styles.instructionsText, { color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)' }]}>
-                      {result.instructions}
+                      {localResult.instructions}
                     </Text>
                   </View>
                 </View>
                 
                 {/* Environmental Impact Section */}
-                {result.recyclable && (
+                {localResult.recyclable && (
                   <View style={styles.sectionContainer}>
                     <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#000000' }]}>
                       Environmental Impact
@@ -426,7 +453,7 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
                           CO₂ Saved
                         </Text>
                         <Text style={[styles.impactValue, { color: isDark ? '#4DC1A1' : '#3A9B7A' }]}>
-                          {result.impact.co2Saved}
+                          {localResult.impact.co2Saved}
                         </Text>
                       </View>
                       
@@ -458,7 +485,7 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
                           Water Saved
                         </Text>
                         <Text style={[styles.impactValue, { color: isDark ? '#64B5F6' : '#3182CE' }]}>
-                          {result.impact.waterSaved}
+                          {localResult.impact.waterSaved}
                         </Text>
                       </View>
                       
@@ -484,9 +511,9 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
                         Equivalent To:
                       </Text>
                       <Text style={[styles.comparisonText, { color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)' }]}>
-                        {result.category.toLowerCase() === 'plastic' ? 'Not using 3 plastic bottles' : 
-                        result.category.toLowerCase() === 'metal' ? 'Driving 2 miles less in a car' : 
-                        result.category.toLowerCase() === 'glass' ? 'Saving 5 minutes of shower water' : 
+                        {localResult.category.toLowerCase() === 'plastic' ? 'Not using 3 plastic bottles' : 
+                        localResult.category.toLowerCase() === 'metal' ? 'Driving 2 miles less in a car' : 
+                        localResult.category.toLowerCase() === 'glass' ? 'Saving 5 minutes of shower water' : 
                         'Conserving natural resources'}
                       </Text>
                     </View>
@@ -494,7 +521,7 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
                 )}
                 
                 {/* If not recyclable, show alternative instructions */}
-                {!result.recyclable && (
+                {!localResult.recyclable && (
                   <View style={styles.sectionContainer}>
                     <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#000000' }]}>
                       Alternative Options
@@ -587,27 +614,38 @@ const styles = StyleSheet.create({
   outerContainer: {
     position: 'absolute',
     width: '100%',
-    maxHeight: '90%',
+    height: '85%', // Use fixed height instead of maxHeight
+    bottom: 20, // Position from bottom for better visibility
     borderRadius: 24,
     overflow: 'hidden',
     zIndex: 999,
+    // Add shadow here so it's not on the LinearGradient
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 10,
+    backgroundColor: '#FFF', // Solid background for shadow calculation
   },
   gradientBackground: {
     width: '100%',
     height: '100%',
     borderRadius: 24,
+    backgroundColor: 'transparent',
   },
   blurContainer: {
     flex: 1,
     borderRadius: 24,
     overflow: 'hidden',
-    padding: 1, // For border effect
+    padding: 1,
   },
   cardContentWrapper: {
     flex: 1,
     borderRadius: 23,
     borderWidth: 0.5,
     overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
   },
   header: {
     flexDirection: 'row',
@@ -623,10 +661,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  itemNameContainer: {
+    flex: 1,
+  },
   itemName: {
     fontSize: 22,
     fontWeight: '700',
-    flex: 1,
+  },
+  mockBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  mockText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   categoryBadge: {
     flexDirection: 'row',
@@ -653,7 +704,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     width: '100%',
-    height: 240,
+    height: 200, // Reduced height to leave more room for content
     position: 'relative',
   },
   scannedImage: {
@@ -726,11 +777,13 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    minHeight: 200, // Ensure minimum height
   },
   scrollContainer: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 30,
+    paddingBottom: 50, // More padding at bottom for better scrolling
+    flexGrow: 1, // Allow content to grow
   },
   sectionContainer: {
     marginBottom: 24,

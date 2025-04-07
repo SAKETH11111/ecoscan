@@ -35,18 +35,54 @@ export const getUserData = () => {
   return { ...userData };
 };
 
+// Helper to extract numeric value from strings like "0.2 kg" or "3 L"
+const extractNumericValue = (valueStr) => {
+  if (typeof valueStr === 'number') return valueStr;
+  
+  const match = valueStr.match(/^(\d+(\.\d+)?)/);
+  if (match && match[1]) {
+    return parseFloat(match[1]);
+  }
+  return 0;
+};
+
 export const addScannedItem = (item) => {
-  if (item.recyclable) {
+  // Skip mock data from being added to stats if it has the flag
+  if (item.isMockData) {
+    // Still add to history but don't count in stats
     userData = {
       ...userData,
-      itemsRecycled: userData.itemsRecycled + 1,
-      co2Saved: userData.co2Saved + parseFloat(item.impact.co2Saved),
-      waterSaved: userData.waterSaved + parseFloat(item.impact.waterSaved),
       scannedItems: [
         { 
           date: new Date().toISOString().split('T')[0],
           itemName: item.itemName,
           recyclable: item.recyclable,
+          impact: item.impact,
+          isMockData: true
+        },
+        ...userData.scannedItems,
+      ].slice(0, 10) // Keep only the last 10 items
+    };
+    return { ...userData };
+  }
+
+  if (item.recyclable) {
+    // Extract numeric values from impact strings (e.g., "0.2 kg" -> 0.2)
+    const co2Value = extractNumericValue(item.impact.co2Saved);
+    const waterValue = extractNumericValue(item.impact.waterSaved);
+    
+    userData = {
+      ...userData,
+      itemsRecycled: userData.itemsRecycled + 1,
+      co2Saved: userData.co2Saved + co2Value,
+      waterSaved: userData.waterSaved + waterValue,
+      scannedItems: [
+        { 
+          date: new Date().toISOString().split('T')[0],
+          itemName: item.itemName,
+          recyclable: item.recyclable,
+          category: item.category,
+          recyclingCode: item.recyclingCode,
           impact: item.impact
         },
         ...userData.scannedItems,
@@ -60,7 +96,9 @@ export const addScannedItem = (item) => {
           date: new Date().toISOString().split('T')[0],
           itemName: item.itemName,
           recyclable: item.recyclable,
-          impact: { co2Saved: 0, waterSaved: 0 }
+          category: item.category,
+          recyclingCode: item.recyclingCode,
+          impact: { co2Saved: "0 kg", waterSaved: "0 L" }
         },
         ...userData.scannedItems,
       ].slice(0, 10) // Keep only the last 10 items

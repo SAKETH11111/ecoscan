@@ -1,0 +1,181 @@
+"""
+Gemini API service for EcoScan application.
+This module provides functions to analyze images of items using Google's Gemini model
+and determine their recyclability status.
+"""
+
+import os
+import base64
+import json
+from typing import Dict, Any, Optional, TypedDict
+from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+import google.generativeai as genai
+from PIL import Image
+
+# Load environment variables
+load_dotenv()
+
+# Configure Gemini API
+API_KEY = os.getenv("GEMINI_API_KEY")
+if not API_KEY:
+    raise ValueError("GEMINI_API_KEY environment variable not set")
+
+genai.configure(api_key=API_KEY)
+
+# Define model
+MODEL = "gemini-2.0-flash"
+
+# Define the response schema
+class Impact(BaseModel):
+    co2Saved: str = Field(description="Amount of CO2 saved by recycling this item")
+    waterSaved: str = Field(description="Amount of water saved by recycling this item")
+
+class RecyclingResult(BaseModel):
+    itemName: str = Field(description="The name of the scanned item")
+    recyclable: bool = Field(description="Whether the item is recyclable")
+    category: str = Field(description="The material category (e.g., Plastic, Glass, Paper, Metal)")
+    recyclingCode: str = Field(description="The recycling code if applicable (e.g., #1 PET, #2 HDPE)")
+    instructions: str = Field(description="Instructions for how to properly recycle or dispose of the item")
+    impact: Impact = Field(description="Environmental impact from recycling this item")
+
+def encode_image(image_path: str) -> str:
+    """Encode an image to base64 string."""
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode("utf-8")
+
+def resize_image(image_path: str, max_size: int = 4 * 1024 * 1024) -> str:
+    """
+    Resize image if it's too large for the API.
+    Returns the path to the resized image (or original if small enough).
+    """
+    try:
+        # Check file size
+        file_size = os.path.getsize(image_path)
+        if file_size <= max_size:
+            return image_path
+        
+        # Open and resize image
+        with Image.open(image_path) as img:
+            # Calculate scaling factor
+            scale_factor = (max_size / file_size) ** 0.5
+            new_width = int(img.width * scale_factor)
+            new_height = int(img.height * scale_factor)
+            
+            # Resize image
+            resized_img = img.resize((new_width, new_height))
+            
+            # Save to a temporary file
+            temp_path = f"{image_path}_resized.jpg"
+            resized_img.save(temp_path, quality=85, optimize=True)
+            
+            return temp_path
+    except Exception as e:
+        print(f"Error resizing image: {e}")
+        # Return original image if resize fails
+        return image_path
+
+def analyze_image(image_path: str) -> Dict[str, Any]:
+    """
+    Analyze an image using Gemini API to determine recyclability.
+    
+    Args:
+        image_path: Path to the image file
+        
+    Returns:
+        Dictionary with recycling information
+    """
+    try:
+        # Resize image if needed
+        processed_image_path = resize_image(image_path)
+        
+        # Create Gemini client
+        model = genai.GenerativeModel(MODEL)
+        
+        # Encode the image
+        image_b64 = encode_image(processed_image_path)
+        
+        # Clean up if we created a resized image
+        if processed_image_path != image_path:
+            try:
+                os.remove(processed_image_path)
+            except:
+                pass
+        
+        # Prepare prompt
+        prompt = """
+        Analyze this image and identify the item shown. Then determine if it's recyclable, 
+        what material category it belongs to, and provide recycling instructions.
+        
+        For recyclable items, provide estimated environmental impact metrics.
+        
+        Be specific about the recycling code for plastics (e.g., #1 PET, #2 HDPE).
+        
+        If you're unsure about the exact item, make your best guess based on visible characteristics.
+        
+        Respond ONLY with the JSON object matching the schema.
+        """
+        
+        # Manually define the schema for robust compatibility
+        recycling_schema = {
+            "type": "OBJECT",
+            "properties": {
+                "itemName": {"type": "STRING"},
+                "recyclable": {"type": "BOOLEAN"},
+                "category": {"type": "STRING"},
+                "recyclingCode": {"type": "STRING"},
+                "instructions": {"type": "STRING"},
+                "impact": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "co2Saved": {"type": "STRING"},
+                        "waterSaved": {"type": "STRING"}
+                    },
+                    "required": ["co2Saved", "waterSaved"]
+                }
+            },
+            "required": ["itemName", "recyclable", "category", "recyclingCode", "instructions", "impact"]
+        }
+
+        # Send request to Gemini
+        response = model.generate_content(
+            contents=[
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": prompt},
+                        {"inline_data": {"mime_type": "image/jpeg", "data": image_b64}}
+                    ]
+                }
+            ],
+            # Configure response to be JSON based on the manually defined schema
+            generation_config=genai.types.GenerationConfig(
+                response_mime_type="application/json",
+                response_schema=recycling_schema, # Use the dictionary schema
+            )
+        )
+        
+        # Parse the response (already JSON)
+        result = json.loads(response.text)
+        
+        # Add the source image URL
+        result["scannedImageUrl"] = image_path
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error analyzing image: {e}")
+        # Return error result
+        return {
+            "itemName": "Unknown Item",
+            "recyclable": False,
+            "category": "Unknown",
+            "recyclingCode": "",
+            "instructions": "Error analyzing image. Please try again.",
+            "impact": {
+                "co2Saved": "0 kg",
+                "waterSaved": "0L"
+            },
+            "scannedImageUrl": image_path,
+            "errorDetails": str(e)
+        }

@@ -9,6 +9,7 @@ import {
   Alert,
   StatusBar,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import * as Camera from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -45,9 +46,6 @@ import {
   useReanimatedSlide
 } from '../hooks/useAnimations';
 
-// Import services
-import { analyzeImage } from '../api/geminiService';
-
 // Animated components
 const AnimatedSafeAreaView = Animated.createAnimatedComponent(SafeAreaView);
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
@@ -55,6 +53,7 @@ const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
 const { width, height } = Dimensions.get('window');
 
+// Define the ScanResult interface based on the JSDoc types in geminiClient.js
 interface ScanResult {
   itemName: string;
   recyclable: boolean;
@@ -65,6 +64,9 @@ interface ScanResult {
     co2Saved: string;
     waterSaved: string;
   };
+  scannedImageUrl?: string;
+  isMockData?: boolean;
+  errorDetails?: string;
 }
 
 const ScanScreen: React.FC = () => {
@@ -268,18 +270,15 @@ const ScanScreen: React.FC = () => {
     }
   };
 
+  // Import the Gemini client at the top level
+  const geminiClient = require('../geminiClient').default;
+  
   // Process scan and analyze image
   const processScan = async (imageUri: string) => {
     setScanning(true);
     try {
-      // Analyze image
-      const result = await analyzeImage(imageUri);
-      
-      // Add the image URI to the result
-      const enhancedResult = {
-        ...result,
-        scannedImageUrl: imageUri
-      };
+      // Send image to Gemini API for analysis
+      const result = await geminiClient.analyzeImage(imageUri);
       
       // Update user data if recyclable
       if (result.recyclable) {
@@ -287,11 +286,25 @@ const ScanScreen: React.FC = () => {
       }
       
       // Update state with result
-      setScanResult(enhancedResult);
-      
+      setScanResult(result);
     } catch (error) {
       console.error('Error analyzing image:', error);
       Alert.alert('Error', 'Could not analyze image. Please try again.');
+      
+      // Fallback to mock data if API fails
+      setScanResult({
+        itemName: "Analysis Failed",
+        recyclable: false,
+        category: "Unknown",
+        recyclingCode: "",
+        instructions: "Failed to analyze the image. Please check your internet connection and try again.",
+        impact: {
+          co2Saved: "0 kg",
+          waterSaved: "0L"
+        },
+        scannedImageUrl: imageUri,
+        errorDetails: error instanceof Error ? error.message : "Unknown error"
+      });
     } finally {
       setScanning(false);
     }
@@ -538,104 +551,111 @@ const ScanScreen: React.FC = () => {
           </Animated.View>
         </View>
         
-        {/* Initial scan UI */}
-        {!previewImage && !scanResult && (
-          <>
-            <Animated.View style={[styles.scanButtonContainer, scanButtonAnimStyle]}>
-              <ScanButton onPress={handleStartScan} text="Tap to Scan" />
-            </Animated.View>
-            
-            <TouchableOpacity 
-              style={styles.galleryButton} 
-              onPress={handleSelectFromGallery}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.galleryButtonText, { color: theme.primary }]}>
-                Select from Gallery
-              </Text>
-            </TouchableOpacity>
-            
-            <Animated.View style={[instructionScaleStyle, instructionSlideStyle]}>
-              <View
-                style={[styles.instructionCard, { 
-                  backgroundColor: isDark ? 'rgba(30,35,45,0.8)' : 'rgba(255,255,255,0.8)',
-                  borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                  borderWidth: 0.5
-                }]}
+        {/* Wrap scrollable content */}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollViewContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Initial scan UI */}
+          {!previewImage && !scanResult && (
+            <>
+              <Animated.View style={[styles.scanButtonContainer, scanButtonAnimStyle]}>
+                <ScanButton onPress={handleStartScan} text="Tap to Scan" />
+              </Animated.View>
+              
+              <TouchableOpacity 
+                style={styles.galleryButton} 
+                onPress={handleSelectFromGallery}
+                activeOpacity={0.7}
               >
-                <View style={styles.instructionIconContainer}>
-                  <MaterialCommunityIcons 
-                    name="recycle" 
-                    size={24} 
-                    color={theme.primary} 
-                  />
-                </View>
-                <Text style={[styles.instruction, { color: theme.textSecondary }]}>
-                  Point your camera at any item to identify how to recycle it
+                <Text style={[styles.galleryButtonText, { color: theme.primary }]}>
+                  Select from Gallery
                 </Text>
+              </TouchableOpacity>
+              
+              <Animated.View style={[instructionScaleStyle, instructionSlideStyle]}>
+                <View
+                  style={[styles.instructionCard, { 
+                    backgroundColor: isDark ? 'rgba(30,35,45,0.8)' : 'rgba(255,255,255,0.8)',
+                    borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                    borderWidth: 0.5
+                  }]}
+                >
+                  <View style={styles.instructionIconContainer}>
+                    <MaterialCommunityIcons 
+                      name="recycle" 
+                      size={24} 
+                      color={theme.primary} 
+                    />
+                  </View>
+                  <Text style={[styles.instruction, { color: theme.textSecondary }]}>
+                    Point your camera at any item to identify how to recycle it
+                  </Text>
+                </View>
+              </Animated.View>
+              
+              {/* Categories preview */}
+              <View style={styles.categoriesContainer}>
+                <Text style={[styles.categoriesTitle, { color: theme.textSecondary }]}>
+                  Scan to identify:
+                </Text>
+                <View style={styles.categories}>
+                  <View style={[styles.categoryBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+                    <MaterialCommunityIcons name="bottle-soda-classic-outline" size={16} color={theme.textSecondary} />
+                    <Text style={[styles.categoryText, { color: theme.textSecondary }]}>Plastic</Text>
+                  </View>
+                  <View style={[styles.categoryBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+                    <MaterialCommunityIcons name="glass-cocktail" size={16} color={theme.textSecondary} />
+                    <Text style={[styles.categoryText, { color: theme.textSecondary }]}>Glass</Text>
+                  </View>
+                  <View style={[styles.categoryBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+                    <MaterialCommunityIcons name="newspaper-variant-outline" size={16} color={theme.textSecondary} />
+                    <Text style={[styles.categoryText, { color: theme.textSecondary }]}>Paper</Text>
+                  </View>
+                </View>
               </View>
-            </Animated.View>
-            
-            {/* Categories preview */}
-            <View style={styles.categoriesContainer}>
-              <Text style={[styles.categoriesTitle, { color: theme.textSecondary }]}>
-                Scan to identify:
-              </Text>
-              <View style={styles.categories}>
-                <View style={[styles.categoryBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
-                  <MaterialCommunityIcons name="bottle-soda-classic-outline" size={16} color={theme.textSecondary} />
-                  <Text style={[styles.categoryText, { color: theme.textSecondary }]}>Plastic</Text>
+            </>
+          )}
+          
+          {/* Preview Image */}
+          {previewImage && !scanResult && (
+            <View style={styles.previewContainer}>
+              <Image 
+                source={{ uri: previewImage }} 
+                style={styles.previewImage}
+                resizeMode="cover"
+              />
+              
+              {/* Loading overlay */}
+              {scanning && (
+                <View style={styles.loadingOverlay}>
+                  <ActivityIndicator size="large" color={theme.primary} />
+                  <Text style={styles.loadingText}>Analyzing item...</Text>
                 </View>
-                <View style={[styles.categoryBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
-                  <MaterialCommunityIcons name="glass-cocktail" size={16} color={theme.textSecondary} />
-                  <Text style={[styles.categoryText, { color: theme.textSecondary }]}>Glass</Text>
-                </View>
-                <View style={[styles.categoryBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
-                  <MaterialCommunityIcons name="newspaper-variant-outline" size={16} color={theme.textSecondary} />
-                  <Text style={[styles.categoryText, { color: theme.textSecondary }]}>Paper</Text>
-                </View>
-              </View>
+              )}
             </View>
-          </>
-        )}
-        
-        {/* Preview Image */}
-        {previewImage && !scanResult && (
-          <View style={styles.previewContainer}>
-            <Image 
-              source={{ uri: previewImage }} 
-              style={styles.previewImage}
-              resizeMode="cover"
+          )}
+          
+          {/* Scan Result Card */}
+          {scanResult && <ScanResultCard result={scanResult} onClose={handleCloseScan} />}
+          
+          {/* New scan button */}
+          {(previewImage || scanResult) && (
+            <AnimatedButton
+              text="Scan New Item"
+              onPress={handleStartScan}
+              style={styles.newScanButton}
+              variant="gradient"
+              size="medium"
+              gradientColors={isDark 
+                ? ['#4DC1A1', '#3AA183']
+                : ['#3A9B7A', '#2A7459']
+              }
+              iconLeft={<Ionicons name="camera-outline" size={20} color="#FFFFFF" />}
             />
-            
-            {/* Loading overlay */}
-            {scanning && (
-              <View style={styles.loadingOverlay}>
-                <ActivityIndicator size="large" color={theme.primary} />
-                <Text style={styles.loadingText}>Analyzing item...</Text>
-              </View>
-            )}
-          </View>
-        )}
-        
-        {/* Scan Result Card */}
-        {scanResult && <ScanResultCard result={scanResult} onClose={handleCloseScan} />}
-        
-        {/* New scan button */}
-        {(previewImage || scanResult) && (
-          <AnimatedButton
-            text="Scan New Item"
-            onPress={handleStartScan}
-            style={styles.newScanButton}
-            variant="gradient"
-            size="medium"
-            gradientColors={isDark 
-              ? ['#4DC1A1', '#3AA183']
-              : ['#3A9B7A', '#2A7459']
-            }
-            iconLeft={<Ionicons name="camera-outline" size={20} color="#FFFFFF" />}
-          />
-        )}
+          )}
+        </ScrollView>
       </Animated.View>
     </AnimatedSafeAreaView>
   );
@@ -647,9 +667,16 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    alignItems: 'center',
     paddingHorizontal: 24,
     paddingTop: 12,
+  },
+  scrollView: {
+    flex: 1,
+    width: '100%',
+  },
+  scrollViewContent: {
+    alignItems: 'center',
+    paddingBottom: 100,
   },
   header: {
     width: '100%',
@@ -694,6 +721,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
   },
   instructionIconContainer: {
     width: 40,
@@ -736,7 +764,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: 6,
   },
-  // Camera styles
   cameraContainer: {
     flex: 1,
     backgroundColor: '#000',
@@ -886,7 +913,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontWeight: '600',
   },
-  // Preview styles
   previewContainer: {
     width: '100%',
     height: 350,
@@ -901,6 +927,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 8,
+    backgroundColor: '#FFFFFF',
   },
   previewImage: {
     width: '100%',

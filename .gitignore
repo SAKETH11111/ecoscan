@@ -1,16 +1,30 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# Node / React Native / Expo
 node_modules/
-
-# Expo
 .expo/
 dist/
 web-build/
 expo-env.d.ts
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
 
-# Native
+# Python
+__pycache__/
+*.pyc
+*.cpython-*.pyc
 *.orig.*
+
+# Uploads / Generated Files
+src/api/uploads/
+*_resized.jpg
+
+# Secrets / Local Config
+.env*.local
+.env
+*.pem
 *.jks
 *.p8
 *.p12
@@ -20,8 +34,9 @@ expo-env.d.ts
 /android/
 /android/
 
-# Metro
-.metro-health-check*
+# Native Build Folders (if checked in, usually not)
+# /ios/
+# /android/
 
 # debug
 npm-debug.*
@@ -39,6 +54,7 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Editor/Tool Specific
 **/CLAUDE.md
 
 **/CLAUDE.local.md

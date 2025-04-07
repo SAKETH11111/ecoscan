@@ -63,9 +63,14 @@ const AnimatedButton: React.FC<AnimatedButtonProps> = ({
   // Animation values
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
-  const elevation = useSharedValue(isDark ? 2 : 4);
+  const elevation = useSharedValue(1); // Use a single default value to avoid direct access in render
   const gradientProgress = useSharedValue(0);
   const highlightOpacity = useSharedValue(0);
+  
+  // Use effect to update elevation based on theme (avoiding direct access in render)
+  useEffect(() => {
+    elevation.value = isDark ? 2 : 4;
+  }, [isDark, elevation]);
   
   const { triggerImpact } = useHapticFeedback();
 
@@ -329,12 +334,15 @@ const AnimatedButton: React.FC<AnimatedButtonProps> = ({
       disabled={disabled || loading}
     >
       {variant === 'gradient' ? (
-        <AnimatedLinearGradient
-          style={[getButtonStyle(), animatedStyle, style]}
-          animatedProps={gradientStyle}
-        >
-          {renderContent()}
-        </AnimatedLinearGradient>
+        // Wrap the gradient in a View that handles the shadow
+        <Animated.View style={[styles.shadowWrapper, animatedStyle]}>
+          <AnimatedLinearGradient
+            style={[getButtonStyle(), style, { elevation: 0, shadowOpacity: 0 }]}
+            animatedProps={gradientStyle}
+          >
+            {renderContent()}
+          </AnimatedLinearGradient>
+        </Animated.View>
       ) : (
         <Animated.View style={[getButtonStyle(), animatedStyle, style]}>
           {renderContent()}
@@ -345,6 +353,16 @@ const AnimatedButton: React.FC<AnimatedButtonProps> = ({
 };
 
 const styles = StyleSheet.create({
+  shadowWrapper: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    elevation: 4, // Android shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    backgroundColor: '#FFFFFF', // Solid background for shadows
+  },
   button: {
     alignItems: 'center',
     justifyContent: 'center',
