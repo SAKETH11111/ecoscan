@@ -54,11 +54,12 @@ interface RecyclingLocation {
   address?: string;
 }
 
+// Define types for resource guides
 interface ResourceGuide {
   id: string;
   title: string;
   category: string;
-  icon: any;
+  icon: string;
   url: string;
 }
 
@@ -114,7 +115,7 @@ const ResourcesScreen: React.FC = () => {
   // Use combined locations: API results + mock data
   const locations = adaptedLocations.length > 0
     ? adaptedLocations
-    : []; // Add mock locations if needed for testing
+    : [];
 
   // Mock data for guides
   const guides: ResourceGuide[] = [
@@ -241,42 +242,34 @@ const ResourcesScreen: React.FC = () => {
     triggerSelection();
   };
 
-  // Open directions in Google Maps
-  const openDirections = async (location: RecyclingLocation) => {
-    // Set loading state
-    setLoadingDirections(location.id);
+  // Handle opening directions
+  const openDirections = async (locationId: string) => {
+    const location = locations.find((loc) => loc.id === locationId);
+    if (!location) return;
 
-    const { latitude, longitude } = location.coordinate;
-    const label = encodeURIComponent(location.name);
-    const url = Platform.select({
-      ios: `maps:0,0?q=${label}@${latitude},${longitude}`,
-      android: `geo:0,0?q=${latitude},${longitude}(${label})`,
-      default: `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&destination_place_id=${label}`,
+    // Set loading state
+    setLoadingDirections(locationId);
+
+    // Create directions URL
+    const directionsUrl = Platform.select({
+      ios: `maps://app?daddr=${location.coordinate.latitude},${location.coordinate.longitude}`,
+      android: `google.navigation:q=${location.coordinate.latitude},${location.coordinate.longitude}`,
     });
 
     try {
-      // Start spinning animation for potential loading icon
-      spinValue.value = 0;
-      spinValue.value = withRepeat(
-        withTiming(1, { duration: 1000, easing: Easing.linear }),
-        -1,
-        false
-      );
-
-      const supported = await Linking.canOpenURL(url);
+      const supported = await Linking.canOpenURL(directionsUrl);
 
       if (supported) {
-        await Linking.openURL(url);
+        await Linking.openURL(directionsUrl);
       } else {
-        // Fallback to web URL if app-specific URL isn't supported
-        const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&destination_place_id=${encodeURIComponent(
-          location.name
-        )}`;
-        await Linking.openURL(webUrl);
+        // Fallback to Google Maps web URL
+        await Linking.openURL(
+          `https://www.google.com/maps/dir/?api=1&destination=${location.coordinate.latitude},${location.coordinate.longitude}`
+        );
       }
     } catch (error) {
       console.error("Error opening directions:", error);
-      Alert.alert("Error", "Cannot open directions at this time");
+      Alert.alert("Error", "Unable to open directions");
     } finally {
       // Clear loading state
       setLoadingDirections(null);
@@ -286,53 +279,28 @@ const ResourcesScreen: React.FC = () => {
     triggerSelection();
   };
 
-  // Toggle category filter
-  const toggleCategory = (category: string) => {
-    setActiveCategory(activeCategory === category ? null : category);
-    triggerSelection();
-  };
-
-  // Filtered guides based on active category
+  // Filter guides by category
   const filteredGuides = activeCategory
     ? guides.filter((guide) => guide.category === activeCategory)
     : guides;
 
-  // Toggle map filter type
-  const toggleMapFilter = (type: string) => {
-    setMapFilterType(mapFilterType === type ? null : type);
-    // In a real app, you would filter the map markers here
-    triggerSelection();
-  };
-
-  // Update the component to display info about the current scan if available
+  // Show current scan info if available
   const renderCurrentScanInfo = () => {
     if (!currentScanResult) return null;
-    
+
     return (
       <Animated.View 
-        entering={FadeInDown.duration(500).delay(200)}
-        style={[styles.currentScanCard, {
-          backgroundColor: theme.backgroundSecondary
-        }]}
+        style={[
+          styles.scanInfo, 
+          { backgroundColor: theme.backgroundSecondary }
+        ]}
+        entering={FadeInDown.duration(300).springify()}
       >
-        <View style={styles.currentScanHeader}>
-          <Ionicons 
-            name="search-circle-outline" 
-            size={24} 
-            color={theme.primary} 
-            style={styles.currentScanIcon}
-          />
-          <Text style={[styles.currentScanTitle, { color: theme.textPrimary }]}>
-            Drop-off Locations
-          </Text>
-        </View>
-        
-        <Text style={[styles.currentScanText, { color: theme.textSecondary }]}>
-          Showing drop-off locations for:
+        <Text style={[styles.scanInfoLabel, { color: theme.textSecondary }]}>
+          Recycling locations for:
         </Text>
-        <Text style={[styles.currentScanItem, { color: theme.textPrimary }]}>
-          {currentScanResult.itemName} ({currentScanResult.category})
-          {currentScanResult.recyclingCode ? ` • Code ${currentScanResult.recyclingCode}` : ''}
+        <Text style={[styles.scanInfoItem, { color: theme.textPrimary }]}>
+          {currentScanResult.itemName} ({currentScanResult.material})
         </Text>
       </Animated.View>
     );
@@ -371,254 +339,148 @@ const ResourcesScreen: React.FC = () => {
         </View>
       );
     }
-    
-    // Normal content with locations
+
     return (
       <>
-        {/* Location cards */}
-        <View style={[styles.sectionContainer, { marginTop: 4 }]}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
-              <Ionicons
-                name="location"
-                size={18}
-                color={theme.primary}
-                style={styles.sectionIcon}
-              />
-              <Text
-                style={[styles.sectionTitle, { color: theme.textPrimary }]}
-              >
-                Nearby Locations
+        <View style={styles.locationHeader}>
+          <Text style={[styles.locationTitle, { color: theme.textPrimary }]}>
+            Nearby Locations
+          </Text>
+          
+          {locations.length > 3 && (
+            <TouchableOpacity onPress={toggleShowAllLocations}>
+              <Text style={[styles.showAllText, { color: theme.primary }]}>
+                {showAllLocations ? "Show Less" : "Show All"}
               </Text>
-              <Text
-                style={{
-                  color: theme.textSecondary,
-                  fontSize: 12,
-                  marginLeft: 8,
-                }}
-              >
-                ({locations.length})
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={[
-                styles.viewAllButton,
-                showAllLocations && styles.showLessButton,
-                {
-                  backgroundColor: showAllLocations
-                    ? theme.primaryLight
-                    : "transparent",
-                },
-              ]}
-              activeOpacity={0.7}
-              onPress={toggleShowAllLocations}
-            >
-              <Text style={[styles.viewAllText, { color: theme.primary }]}>
-                {showAllLocations ? "Show Less" : "View All"}
-              </Text>
-              <Ionicons
-                name={showAllLocations ? "chevron-up" : "chevron-forward"}
-                size={14}
-                color={theme.primary}
-                style={{ marginLeft: 2 }}
-              />
             </TouchableOpacity>
-          </View>
-
-          {(showAllLocations ? locations : locations.slice(0, 3)).map(
-            (location, index) => (
-              <AnimatedTouchable
-                key={location.id}
-                entering={
-                  showAllLocations && index >= 3
-                    ? FadeInDown.delay(index * 60)
-                        .springify()
-                        .duration(350)
-                    : SlideInRight.delay(index * 100).springify()
-                }
-                style={[
-                  styles.locationCard,
-                  selectedLocation === location.id && styles.selectedCard,
-                  {
-                    backgroundColor: theme.backgroundSecondary,
-                    borderColor:
-                      selectedLocation === location.id
-                        ? getLocationColor(location.type)
-                        : "transparent",
-                  },
-                ]}
-                onPress={() => {
-                  setSelectedLocation(
-                    selectedLocation === location.id ? null : location.id
-                  );
-                  triggerSelection();
-                }}
-                activeOpacity={0.7}
-              >
-                <View
-                  style={[
-                    styles.locationIconContainer,
-                    { backgroundColor: getLocationColor(location.type) },
-                  ]}
-                >
-                  <Ionicons
-                    name={getLocationIcon(location.type)}
-                    size={18}
-                    color="#FFFFFF"
-                  />
-                </View>
-
-                <View style={styles.locationInfo}>
-                  <Text
-                    style={[
-                      styles.locationName,
-                      { color: theme.textPrimary },
-                    ]}
-                  >
-                    {location.name}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.locationDistance,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {location.distance}
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.directionsButton,
-                    { backgroundColor: theme.primary },
-                  ]}
-                  onPress={() => openDirections(location)}
-                  disabled={loadingDirections === location.id}
-                >
-                  {loadingDirections === location.id ? (
-                    <View style={styles.directionsLoadingContainer}>
-                      <Text
-                        style={[
-                          styles.directionsButtonText,
-                          { color: theme.textInverse },
-                        ]}
-                      >
-                        Opening
-                      </Text>
-                      <Animated.View
-                        style={{
-                          marginLeft: 4,
-                          transform: [
-                            {
-                              rotate:
-                                interpolate(
-                                  spinValue.value,
-                                  [0, 1],
-                                  [0, 360]
-                                ) + "deg",
-                            },
-                          ],
-                        }}
-                      >
-                        <Ionicons
-                          name="navigate-circle-outline"
-                          size={14}
-                          color={theme.textInverse}
-                        />
-                      </Animated.View>
-                    </View>
-                  ) : (
-                    <View style={styles.directionsLoadingContainer}>
-                      <Text
-                        style={[
-                          styles.directionsButtonText,
-                          { color: theme.textInverse },
-                        ]}
-                      >
-                        Directions
-                      </Text>
-                      <Ionicons
-                        name="navigate-outline"
-                        size={14}
-                        color={theme.textInverse}
-                        style={{ marginLeft: 4 }}
-                      />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </AnimatedTouchable>
-            )
-          )}
-
-          {!showAllLocations && locations.length > 3 && (
-            <Animated.View
-              entering={FadeIn.delay(300)}
-              style={styles.moreIndicator}
-            >
-              <View
-                style={[
-                  styles.dotIndicator,
-                  { backgroundColor: theme.textSecondary },
-                ]}
-              ></View>
-              <View
-                style={[
-                  styles.dotIndicator,
-                  { backgroundColor: theme.textSecondary },
-                ]}
-              ></View>
-              <View
-                style={[
-                  styles.dotIndicator,
-                  { backgroundColor: theme.textSecondary },
-                ]}
-              ></View>
-            </Animated.View>
           )}
         </View>
 
-        {/* Resource Guides Section */}
-        <View
-          style={[styles.sectionContainer, { marginTop: 8, marginBottom: 0 }]}
+        <Animated.View
+          layout={FadeIn}
+          style={styles.locationsContainer}
         >
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
-              <Ionicons
-                name="book"
-                size={18}
-                color={theme.primary}
-                style={styles.sectionIcon}
-              />
-              <Text
-                style={[styles.sectionTitle, { color: theme.textPrimary }]}
+          {(showAllLocations ? locations : locations.slice(0, 3)).map((location, index) => (
+            <AnimatedCard
+              key={location.id}
+              style={[
+                styles.locationCard,
+                {
+                  backgroundColor: theme.backgroundCard,
+                  borderColor: selectedLocation === location.id
+                    ? getLocationColor(location.type)
+                    : 'transparent',
+                  borderWidth: selectedLocation === location.id ? 2 : 0,
+                }
+              ]}
+              entering={FadeIn.delay(index * 100)}
+              onPress={() => setSelectedLocation(
+                selectedLocation === location.id ? null : location.id
+              )}
+            >
+              <View
+                style={[
+                  styles.locationTypeIcon,
+                  { backgroundColor: getLocationColor(location.type) },
+                ]}
               >
-                Helpful Resources
-              </Text>
-            </View>
-          </View>
+                <Ionicons
+                  name={getLocationIcon(location.type)}
+                  size={20}
+                  color="#FFFFFF"
+                />
+              </View>
 
-          {/* Category filter */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryContainer}
-            style={{ marginLeft: -2 }}
-          >
+              <View style={styles.locationInfo}>
+                <Text
+                  style={[styles.locationName, { color: theme.textPrimary }]}
+                  numberOfLines={1}
+                >
+                  {location.name}
+                </Text>
+                <View style={styles.locationDetails}>
+                  {location.distance && (
+                    <View style={styles.locationDetail}>
+                      <Ionicons
+                        name="location-outline"
+                        size={14}
+                        color={theme.textSecondary}
+                        style={styles.locationDetailIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.locationDetailText,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        {location.distance}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.locationDetail}>
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={14}
+                      color={theme.textSecondary}
+                      style={styles.locationDetailIcon}
+                    />
+                    <Text
+                      style={[
+                        styles.locationDetailText,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      {location.type.charAt(0).toUpperCase() + location.type.slice(1)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.directionsButton,
+                  { backgroundColor: theme.primary },
+                ]}
+                onPress={() => openDirections(location.id)}
+                activeOpacity={0.7}
+              >
+                {loadingDirections === location.id ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="navigate" size={18} color="#FFFFFF" />
+                )}
+              </TouchableOpacity>
+            </AnimatedCard>
+          ))}
+        </Animated.View>
+
+        <View style={styles.divider} />
+
+        <View style={styles.guidesSection}>
+          <Text style={[styles.guidesTitle, { color: theme.textPrimary }]}>
+            Helpful Resources
+          </Text>
+
+          <View style={styles.categories}>
             {categories.map((category) => (
               <TouchableOpacity
                 key={category}
                 style={[
                   styles.categoryButton,
-                  activeCategory === category && styles.activeCategoryButton,
                   {
                     backgroundColor:
                       activeCategory === category
-                        ? theme.primary
-                        : theme.backgroundSecondary,
+                        ? theme.primaryLight
+                        : "transparent",
+                    borderColor: theme.primaryLight,
                   },
                 ]}
-                onPress={() => toggleCategory(category)}
+                onPress={() => {
+                  setActiveCategory(
+                    activeCategory === category ? null : category
+                  );
+                  triggerSelection();
+                }}
               >
                 <Text
                   style={[
@@ -626,8 +488,8 @@ const ResourcesScreen: React.FC = () => {
                     {
                       color:
                         activeCategory === category
-                          ? theme.textInverse
-                          : theme.textPrimary,
+                          ? theme.primary
+                          : theme.textSecondary,
                     },
                   ]}
                 >
@@ -635,91 +497,60 @@ const ResourcesScreen: React.FC = () => {
                 </Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </View>
 
-          {/* Guide cards */}
-          <Animated.View
-            entering={FadeIn.duration(400)}
-            style={{ paddingTop: 4 }}
-          >
+          <Animated.View style={styles.guides}>
             {filteredGuides.map((guide, index) => (
               <AnimatedCard
                 key={guide.id}
-                style={{
-                  ...styles.guideCard,
-                  backgroundColor: theme.backgroundSecondary,
-                }}
-                pressable={loadingResource !== guide.id}
-                hapticFeedback={true}
+                style={[
+                  styles.guideCard,
+                  { backgroundColor: theme.backgroundCard },
+                ]}
                 onPress={() => openResourceUrl(guide.url, guide.id)}
-                initialDelay={index * 100}
+                entering={SlideInRight.delay(index * 100)}
               >
-                <View>
+                <View style={styles.guideInfo}>
                   <Text
                     style={[styles.guideTitle, { color: theme.textPrimary }]}
+                    numberOfLines={2}
                   >
                     {guide.title}
                   </Text>
-                  <Text
-                    style={[
-                      styles.guideCategory,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {guide.category}
-                  </Text>
-                  <View style={styles.learnMoreContainer}>
-                    <Text style={[styles.guideUrl, { color: theme.primary }]}>
-                      {loadingResource === guide.id
-                        ? "Opening..."
-                        : "Learn More"}
-                    </Text>
-                    {loadingResource === guide.id ? (
-                      <Animated.View
+                  <View style={styles.guideDetails}>
+                    <View style={styles.guideTag}>
+                      <Text
                         style={[
-                          {
-                            marginLeft: 4,
-                            transform: [
-                              {
-                                rotate: spinValue.value
-                                  ? interpolate(
-                                      spinValue.value,
-                                      [0, 1],
-                                      [0, 360]
-                                    ) + "deg"
-                                  : "0deg",
-                              },
-                            ],
-                          },
+                          styles.guideTagText,
+                          { color: theme.textSecondary },
                         ]}
                       >
-                        <Ionicons
-                          name="sync-outline"
-                          size={12}
-                          color={theme.primary}
-                        />
-                      </Animated.View>
-                    ) : (
-                      <Ionicons
-                        name="open-outline"
-                        size={12}
-                        color={theme.primary}
-                        style={{ marginLeft: 4 }}
-                      />
-                    )}
+                        {guide.category}
+                      </Text>
+                    </View>
                   </View>
                 </View>
+
                 <View
                   style={[
-                    styles.guideIconContainer,
-                    { backgroundColor: theme.primaryLight },
+                    styles.guideIcon,
+                    {
+                      backgroundColor: theme.primaryLight,
+                    },
                   ]}
                 >
-                  <Ionicons
-                    name={guide.icon as any}
-                    size={18}
-                    color={theme.primary}
-                  />
+                  {loadingResource === guide.id ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.primary}
+                    />
+                  ) : (
+                    <Ionicons
+                      name={guide.icon}
+                      size={24}
+                      color={theme.primary}
+                    />
+                  )}
                 </View>
               </AnimatedCard>
             ))}
@@ -754,26 +585,22 @@ const ResourcesScreen: React.FC = () => {
         onScroll={scrollHandler}
         scrollEventThrottle={16}
       >
-        {/* Map */}
-        <RecyclingMap
-          height={300}
-          onLocationPress={(loc) => setSelectedLocation(loc.id)}
-          showUserLocation={true}
-          // Add locations to the map
-          locations={locations}
-          // Filter by type if selected
-          filter={mapFilterType}
-        />
-        
-        {/* Map Filters */}
-        <View style={styles.filterContainer}>
-          {/* ... existing filters ... */}
-        </View>
+        {/* Map only if we have locations */}
+        {locations.length > 0 && (
+          <RecyclingMap
+            height={300}
+            onLocationPress={(loc) => setSelectedLocation(loc.id)}
+            showUserLocation={true}
+            // Add locations to the map
+            locations={locations}
+            // Filter by type if selected
+            filter={mapFilterType}
+          />
+        )}
         
         {/* Main content */}
         {renderContent()}
         
-        {/* ... guides section ... */}
       </Animated.ScrollView>
     </SafeAreaView>
   );
@@ -1199,6 +1026,138 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     textAlign: "center",
+  },
+  locationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+  },
+  locationTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  showAllText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  locationsContainer: {
+    padding: 16,
+  },
+  locationTypeIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 16,
+  },
+  locationInfo: {
+    flex: 1,
+  },
+  locationDetails: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  locationDetail: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  locationDetailIcon: {
+    marginRight: 4,
+  },
+  locationDetailText: {
+    fontSize: 13,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#E0E0E0",
+  },
+  guidesSection: {
+    padding: 16,
+  },
+  guidesTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 16,
+  },
+  categories: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  categoryButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    marginRight: 8,
+    borderWidth: 1,
+  },
+  categoryText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  guides: {
+    marginTop: 16,
+  },
+  guideCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 14,
+    marginBottom: 12,
+    borderRadius: 12,
+  },
+  guideInfo: {
+    flex: 1,
+  },
+  guideDetails: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  guideTag: {
+    padding: 4,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  guideTagText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  guideIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scanInfo: {
+    marginHorizontal: 16,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  scanInfoLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  scanInfoItem: {
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 

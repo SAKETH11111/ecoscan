@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, StyleSheet, TouchableWithoutFeedback, Text } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -122,7 +122,7 @@ const ScanButton: React.FC<ScanButtonProps> = ({
     onPress();
   };
 
-  // Apply animations to button
+  // Apply animations to button using useMemo to improve performance
   const animatedMainStyle = useAnimatedStyle(() => {
     return {
       transform: [
@@ -133,10 +133,13 @@ const ScanButton: React.FC<ScanButtonProps> = ({
     };
   });
 
-  // Inner circle animation
+  // Inner circle animation - separate content transform to prevent blurry text
   const animatedInnerStyle = useAnimatedStyle(() => {
+    // We use a counter-scale to keep text and icon crisp
     return {
-      transform: [{ scale: 1 / pulse.value }],
+      transform: [
+        { scale: 1 }
+      ],
     };
   });
 
@@ -152,6 +155,29 @@ const ScanButton: React.FC<ScanButtonProps> = ({
   const ringSize = buttonSize + 20;
   const ringRadius = ringSize / 2;
 
+  // Use useMemo for static styles to improve performance
+  const buttonStyle = useMemo(() => ([
+    styles.button,
+    {
+      width: buttonSize,
+      height: buttonSize,
+      borderRadius: buttonSize / 2,
+      backgroundColor: theme.primary,
+    },
+    animatedMainStyle,
+  ]), [buttonSize, theme.primary, animatedMainStyle]);
+
+  const ringStyle = useMemo(() => ([
+    styles.ring, 
+    { 
+      width: ringSize, 
+      height: ringSize, 
+      borderRadius: ringRadius,
+      backgroundColor: theme.primaryLight,
+    },
+    animatedRingStyle,
+  ]), [ringSize, ringRadius, theme.primaryLight, animatedRingStyle]);
+
   return (
     <View style={styles.container}>
       <TouchableWithoutFeedback
@@ -162,33 +188,11 @@ const ScanButton: React.FC<ScanButtonProps> = ({
       >
         <View style={styles.buttonWrapper}>
           {/* Subtle animated ring */}
-          <Animated.View 
-            style={[
-              styles.ring, 
-              { 
-                width: ringSize, 
-                height: ringSize, 
-                borderRadius: ringRadius,
-                backgroundColor: theme.primaryLight,
-              },
-              animatedRingStyle,
-            ]} 
-          />
+          <Animated.View style={ringStyle} />
           
           {/* Main button */}
-          <Animated.View
-            style={[
-              styles.button,
-              {
-                width: buttonSize,
-                height: buttonSize,
-                borderRadius: buttonSize / 2,
-                backgroundColor: theme.primary,
-              },
-              animatedMainStyle,
-            ]}
-          >
-            {/* Content container with counter animation to keep icon steady */}
+          <Animated.View style={buttonStyle}>
+            {/* Content container */}
             <Animated.View style={[styles.content, animatedInnerStyle]}>
               <Ionicons name="camera" size={buttonSize * 0.25} color={theme.textInverse} />
               <Text style={[styles.text, { color: theme.textInverse }]}>{text}</Text>
@@ -234,6 +238,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginTop: 10,
+    textAlign: 'center',
   },
 });
 

@@ -7,7 +7,7 @@ and determine their recyclability status.
 import os
 import base64
 import json
-from typing import Dict, Any, Optional, TypedDict
+from typing import Dict, Any, Optional, TypedDict, List
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 import google.generativeai as genai
@@ -31,6 +31,12 @@ class Impact(BaseModel):
     co2Saved: str = Field(description="Amount of CO2 saved by recycling this item")
     waterSaved: str = Field(description="Amount of water saved by recycling this item")
 
+class AlternativeOption(BaseModel):
+    option: str = Field(description="Alternative option for handling the item if not recyclable")
+
+class RecyclingTip(BaseModel):
+    tip: str = Field(description="General recycling tip relevant to this type of item")
+
 class RecyclingResult(BaseModel):
     itemName: str = Field(description="The name of the scanned item")
     recyclable: bool = Field(description="Whether the item is recyclable")
@@ -38,6 +44,8 @@ class RecyclingResult(BaseModel):
     recyclingCode: str = Field(description="The recycling code if applicable (e.g., #1 PET, #2 HDPE)")
     instructions: str = Field(description="Instructions for how to properly recycle or dispose of the item")
     impact: Impact = Field(description="Environmental impact from recycling this item")
+    alternativeOptions: List[AlternativeOption] = Field(description="Alternative disposal options if not recyclable")
+    recyclingTips: List[RecyclingTip] = Field(description="General recycling tips")
 
 def encode_image(image_path: str) -> str:
     """Encode an image to base64 string."""
@@ -102,7 +110,7 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
             except:
                 pass
         
-        # Prepare prompt
+        # Prepare prompt with example output
         prompt = """
         Analyze this image and identify the item shown. Then determine if it's recyclable, 
         what material category it belongs to, and provide recycling instructions.
@@ -111,7 +119,36 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
         
         Be specific about the recycling code for plastics (e.g., #1 PET, #2 HDPE).
         
+        Also provide 3 alternative options for disposal if the item is not recyclable,
+        and 3 general recycling tips relevant to this type of item.
+        
         If you're unsure about the exact item, make your best guess based on visible characteristics.
+        
+        Here's an example of the expected output format:
+        
+        ```json
+        {
+          "itemName": "Plastic Water Bottle",
+          "recyclable": true,
+          "category": "Plastic",
+          "recyclingCode": "#1 PET",
+          "instructions": "Empty, rinse, and replace cap before recycling in your curbside bin. Remove label if possible.",
+          "impact": {
+            "co2Saved": "0.3 kg",
+            "waterSaved": "4.8L"
+          },
+          "alternativeOptions": [
+            {"option": "Reuse the bottle for storing homemade beverages"},
+            {"option": "Use for DIY crafts or gardening projects"},
+            {"option": "Look for brands with recyclable packaging"}
+          ],
+          "recyclingTips": [
+            {"tip": "Always rinse containers before recycling"},
+            {"tip": "Check the recycling number on plastic items"},
+            {"tip": "Remove caps and labels when required by local guidelines"}
+          ]
+        }
+        ```
         
         Respond ONLY with the JSON object matching the schema.
         """
@@ -132,9 +169,29 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
                         "waterSaved": {"type": "STRING"}
                     },
                     "required": ["co2Saved", "waterSaved"]
+                },
+                "alternativeOptions": {
+                    "type": "ARRAY",
+                    "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "option": {"type": "STRING"}
+                        },
+                        "required": ["option"]
+                    }
+                },
+                "recyclingTips": {
+                    "type": "ARRAY",
+                    "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "tip": {"type": "STRING"}
+                        },
+                        "required": ["tip"]
+                    }
                 }
             },
-            "required": ["itemName", "recyclable", "category", "recyclingCode", "instructions", "impact"]
+            "required": ["itemName", "recyclable", "category", "recyclingCode", "instructions", "impact", "alternativeOptions", "recyclingTips"]
         }
 
         # Send request to Gemini
@@ -176,6 +233,16 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
                 "co2Saved": "0 kg",
                 "waterSaved": "0L"
             },
+            "alternativeOptions": [
+                {"option": "Check local special waste disposal options"},
+                {"option": "Look for brands with recyclable alternatives"},
+                {"option": "Consider reusing the item if possible"}
+            ],
+            "recyclingTips": [
+                {"tip": "Always rinse containers before recycling"},
+                {"tip": "Check the recycling number on plastic items"},
+                {"tip": "Remove caps and labels when required by local guidelines"}
+            ],
             "scannedImageUrl": image_path,
             "errorDetails": str(e)
         }

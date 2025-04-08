@@ -22,6 +22,7 @@ import { useHapticFeedback, useReanimatedScale } from '../hooks/useAnimations';
 import { useAppContext } from '../context/AppContext';
 // @ts-ignore
 import { useNavigation } from '@react-navigation/native';
+import TestImage from './TestImage';
 
 const { width } = Dimensions.get('window');
 
@@ -39,6 +40,8 @@ interface ScanResult {
   scannedImageUrl?: string;
   isMockData?: boolean;
   errorDetails?: string;
+  alternativeOptions?: Array<{option: string}>;
+  recyclingTips?: Array<{tip: string}>;
 }
 
 interface ScanResultCardProps {
@@ -187,12 +190,15 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
   });
   
   // Animations
-  const cardSwipeStyle = useAnimatedStyle(() => ({
+  const cardTransformStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: cardX.value },
       { rotate: `${cardRotate.value}rad` },
       { translateY: cardY.value },
     ],
+  }));
+  
+  const cardOpacityStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
   }));
   
@@ -280,359 +286,411 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
   };
 
   return (
-    <PanGestureHandler onGestureEvent={gestureHandler}>
-      <Animated.View
-        style={[
-          styles.container, 
-          { backgroundColor: isDark ? theme.backgroundSecondary : '#FFFFFF' },
-          cardSwipeStyle, 
-          cardScaleStyle
-        ]}
-        entering={FadeIn.duration(300).springify()}
-        exiting={FadeOut.duration(200)}
-      >
-        {/* Header */}
-        <View style={[styles.header, { 
-          borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
-        }]}>
-          <View style={styles.headerTitleRow}>
-            <Text numberOfLines={1} style={[
-              styles.titleText, 
-              { color: isDark ? '#ffffff' : '#000000' }
-            ]}>
-              {localResult.itemName}
-            </Text>
-            <TouchableOpacity 
-              onPress={handleClose} 
-              style={styles.closeButton}
-              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-            >
-              <Ionicons 
-                name="close" 
-                size={24} 
-                color={isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.6)'} 
-              />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.headerInfoRow}>
-            <View style={[styles.categoryBadge, { 
-              backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' 
-            }]}>
-              {getCategoryIcon()}
-              <Text style={[styles.categoryText, { 
-                color: isDark ? '#e0e0e0' : '#333' 
-              }]}>
-                {localResult.category}
+    <Animated.View style={cardOpacityStyle}>
+      <PanGestureHandler onGestureEvent={gestureHandler}>
+        <Animated.View
+          style={[
+            styles.container, 
+            { backgroundColor: isDark ? theme.backgroundSecondary : '#FFFFFF' },
+            cardTransformStyle, 
+            cardScaleStyle
+          ]}
+          entering={FadeIn.duration(300).springify()}
+          exiting={FadeOut.duration(200)}
+        >
+          {/* Header */}
+          <View style={[styles.header, { 
+            borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+          }]}>
+            <View style={styles.headerTitleRow}>
+              <Text numberOfLines={1} style={[
+                styles.titleText, 
+                { color: isDark ? '#ffffff' : '#000000' }
+              ]}>
+                {localResult.itemName}
               </Text>
+              <TouchableOpacity 
+                onPress={handleClose} 
+                style={styles.closeButton}
+                hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+              >
+                <Ionicons 
+                  name="close" 
+                  size={24} 
+                  color={isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.6)'} 
+                />
+              </TouchableOpacity>
             </View>
             
-            {localResult.isMockData && (
-              <View style={[styles.mockBadge, { 
-                backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+            <View style={styles.headerInfoRow}>
+              <View style={[styles.categoryBadge, { 
+                backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' 
               }]}>
-                <Text style={[styles.mockText, { 
-                  color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' 
+                {getCategoryIcon()}
+                <Text style={[styles.categoryText, { 
+                  color: isDark ? '#e0e0e0' : '#333' 
                 }]}>
-                  Example
+                  {localResult.category}
                 </Text>
               </View>
-            )}
-            
-            <Text style={[styles.timestampText, { 
-              color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' 
-            }]}>
-              {new Date().toLocaleDateString()}
-            </Text>
-          </View>
-        </View>
-        
-        {/* Scrollable Content */}
-        <ScrollView 
-          style={styles.scrollView} 
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          bounces={true}
-        >
-          {/* Status Banner */}
-          <View style={[styles.statusBanner, { backgroundColor: statusBgColor }]}>
-            <View style={styles.statusContent}>
-              <Ionicons 
-                name={localResult.recyclable ? 'checkmark-circle' : 'alert-circle'} 
-                size={28} 
-                color="white" 
-                style={styles.statusIcon}
-              />
-              <Text style={styles.statusText}>
-                {localResult.recyclable ? 'Recyclable' : 'Not Recyclable'}
-              </Text>
               
-              {localResult.recyclingCode && (
-                <View style={styles.recyclingCodeBadge}>
-                  <Text style={styles.recyclingCodeText}>{localResult.recyclingCode}</Text>
+              {localResult.isMockData && (
+                <View style={[styles.mockBadge, { 
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+                }]}>
+                  <Text style={[styles.mockText, { 
+                    color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' 
+                  }]}>
+                    Example
+                  </Text>
                 </View>
               )}
-            </View>
-            
-            {/* Shimmer effect */}
-            <Animated.View style={[styles.shimmer, shimmerStyle]} />
-          </View>
-
-          {/* Image Card */}
-          {localResult.scannedImageUrl && (
-            <View style={[styles.imageCard, { 
-              backgroundColor: isDark ? theme.backgroundCard : '#FFFFFF',
-            }]}>
-              <Image 
-                source={{ uri: localResult.scannedImageUrl }}
-                style={styles.scannedImage}
-                resizeMode="cover"
-              />
-            </View>
-          )}
-          
-          {/* Instructions Section */}
-          <View style={[styles.card, { 
-            backgroundColor: isDark ? theme.backgroundCard : '#FFFFFF',
-          }]}>
-            <Text style={[styles.cardTitle, { 
-              color: isDark ? '#ffffff' : '#000000' 
-            }]}>
-              Instructions
-            </Text>
-            <Text style={[styles.cardText, { 
-              color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)' 
-            }]}>
-              {localResult.instructions}
-            </Text>
-          </View>
-          
-          {/* Environmental Impact Section */}
-          {localResult.recyclable && (
-            <View style={[styles.card, { 
-              backgroundColor: isDark ? theme.backgroundCard : '#FFFFFF',
-            }]}>
-              <Text style={[styles.cardTitle, { 
-                color: isDark ? '#ffffff' : '#000000' 
+              
+              <Text style={[styles.timestampText, { 
+                color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' 
               }]}>
-                Environmental Impact
+                {new Date().toLocaleDateString()}
               </Text>
-              
-              {/* CO2 Impact */}
-              <View style={styles.impactRow}>
-                <View style={[styles.impactIconContainer, {
-                  backgroundColor: isDark ? 'rgba(77, 193, 161, 0.15)' : 'rgba(58, 155, 122, 0.1)'
-                }]}>
-                  <Ionicons name="cloud-outline" size={22} color={isDark ? '#4DC1A1' : '#3A9B7A'} />
-                </View>
-                <View style={styles.impactDetails}>
-                  <View style={styles.impactLabelRow}>
-                    <Text style={[styles.impactLabel, { 
-                      color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)' 
-                    }]}>
-                      CO₂ Saved
-                    </Text>
-                    <Text style={[styles.impactValue, { 
-                      color: isDark ? '#4DC1A1' : '#3A9B7A' 
-                    }]}>
-                      {localResult.impact.co2Saved}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.progressContainer}>
-                    <View style={[styles.progressBg, { 
-                      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' 
-                    }]}>
-                      <Animated.View 
-                        style={[
-                          styles.progressFill, 
-                          { backgroundColor: isDark ? '#4DC1A1' : '#3A9B7A' },
-                          co2BarStyle
-                        ]} 
-                      />
-                    </View>
-                  </View>
-                </View>
-              </View>
-              
-              {/* Water Impact */}
-              <View style={styles.impactRow}>
-                <View style={[styles.impactIconContainer, {
-                  backgroundColor: isDark ? 'rgba(100, 181, 246, 0.15)' : 'rgba(30, 136, 229, 0.1)'
-                }]}>
-                  <Ionicons name="water-outline" size={22} color={isDark ? '#64B5F6' : '#3182CE'} />
-                </View>
-                <View style={styles.impactDetails}>
-                  <View style={styles.impactLabelRow}>
-                    <Text style={[styles.impactLabel, { 
-                      color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)' 
-                    }]}>
-                      Water Saved
-                    </Text>
-                    <Text style={[styles.impactValue, { 
-                      color: isDark ? '#64B5F6' : '#3182CE' 
-                    }]}>
-                      {localResult.impact.waterSaved}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.progressContainer}>
-                    <View style={[styles.progressBg, { 
-                      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' 
-                    }]}>
-                      <Animated.View 
-                        style={[
-                          styles.progressFill, 
-                          { backgroundColor: isDark ? '#64B5F6' : '#3182CE' },
-                          waterBarStyle
-                        ]} 
-                      />
-                    </View>
-                  </View>
-                </View>
-              </View>
-              
-              {/* Equivalent Impact */}
-              <View style={[styles.equivalentBox, {
-                backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-              }]}>
-                <Text style={[styles.equivalentLabel, { 
-                  color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' 
-                }]}>
-                  Equivalent to:
-                </Text>
-                <Text style={[styles.equivalentText, { 
-                  color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)' 
-                }]}>
-                  {localResult.category.toLowerCase() === 'plastic' ? 'Not using 3 plastic bottles' : 
-                  localResult.category.toLowerCase() === 'metal' ? 'Driving 2 miles less in a car' : 
-                  localResult.category.toLowerCase() === 'glass' ? 'Saving 5 minutes of shower water' : 
-                  'Conserving natural resources'}
-                </Text>
-              </View>
             </View>
-          )}
+          </View>
           
-          {/* Alternative Options - if not recyclable */}
-          {!localResult.recyclable && (
+          {/* Scrollable Content */}
+          <ScrollView 
+            style={styles.scrollView} 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+          >
+            {/* Status Banner */}
+            <View style={[styles.statusBanner, { backgroundColor: statusBgColor }]}>
+              <View style={styles.statusContent}>
+                <Ionicons 
+                  name={localResult.recyclable ? 'checkmark-circle' : 'alert-circle'} 
+                  size={28} 
+                  color="white" 
+                  style={styles.statusIcon}
+                />
+                <Text style={styles.statusText}>
+                  {localResult.recyclable ? 'Recyclable' : 'Not Recyclable'}
+                </Text>
+                
+                {localResult.recyclingCode && (
+                  <View style={styles.recyclingCodeBadge}>
+                    <Text style={styles.recyclingCodeText}>{localResult.recyclingCode}</Text>
+                  </View>
+                )}
+              </View>
+              
+              {/* Shimmer effect */}
+              <Animated.View style={[styles.shimmer, shimmerStyle]} />
+            </View>
+
+            {/* Image Card */}
+            {localResult.scannedImageUrl && (
+              <>
+                <View style={[styles.imageCard, { 
+                  backgroundColor: isDark ? theme.backgroundCard : '#FFFFFF',
+                }]}>
+                  <Image 
+                    source={{ uri: localResult.scannedImageUrl }}
+                    style={styles.scannedImage}
+                    resizeMode="cover"
+                    onLoad={() => console.log('Image loaded successfully')}
+                    onError={(error) => console.error('Image load error:', error.nativeEvent.error)}
+                  />
+                </View>
+                {/* Debug Text */}
+                <View style={styles.debugContainer}>
+                  <Text style={[styles.debugText, { color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }]}>
+                    Image URI: {localResult.scannedImageUrl.substring(0, 50)}...
+                  </Text>
+                </View>
+              </>
+            )}
+            
+            {/* Instructions Section */}
             <View style={[styles.card, { 
               backgroundColor: isDark ? theme.backgroundCard : '#FFFFFF',
             }]}>
               <Text style={[styles.cardTitle, { 
                 color: isDark ? '#ffffff' : '#000000' 
               }]}>
-                Alternative Options
+                Instructions
               </Text>
               <Text style={[styles.cardText, { 
                 color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)' 
               }]}>
-                Instead of throwing this in the regular trash, consider:
+                {localResult.instructions}
               </Text>
-              <View style={styles.alternativesList}>
-                <View style={styles.alternativeItem}>
-                  <Ionicons 
-                    name="arrow-forward-circle-outline" 
-                    size={18} 
-                    color={isDark ? theme.accent : theme.warning} 
-                    style={styles.bulletIcon} 
-                  />
-                  <Text style={[styles.alternativeText, { 
-                    color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+            </View>
+            
+            {/* Environmental Impact Section */}
+            {localResult.recyclable && (
+              <View style={[styles.card, { 
+                backgroundColor: isDark ? theme.backgroundCard : '#FFFFFF',
+              }]}>
+                <Text style={[styles.cardTitle, { 
+                  color: isDark ? '#ffffff' : '#000000' 
+                }]}>
+                  Environmental Impact
+                </Text>
+                
+                {/* CO2 Impact */}
+                <View style={styles.impactRow}>
+                  <View style={[styles.impactIconContainer, {
+                    backgroundColor: isDark ? 'rgba(77, 193, 161, 0.15)' : 'rgba(58, 155, 122, 0.1)'
                   }]}>
-                    Check local special waste disposal options
-                  </Text>
+                    <Ionicons name="cloud-outline" size={22} color={isDark ? '#4DC1A1' : '#3A9B7A'} />
+                  </View>
+                  <View style={styles.impactDetails}>
+                    <View style={styles.impactLabelRow}>
+                      <Text style={[styles.impactLabel, { 
+                        color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)' 
+                      }]}>
+                        CO₂ Saved
+                      </Text>
+                      <Text style={[styles.impactValue, { 
+                        color: isDark ? '#4DC1A1' : '#3A9B7A' 
+                      }]}>
+                        {localResult.impact.co2Saved}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.progressContainer}>
+                      <View style={[styles.progressBg, { 
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' 
+                      }]}>
+                        <Animated.View 
+                          style={[
+                            styles.progressFill, 
+                            { backgroundColor: isDark ? '#4DC1A1' : '#3A9B7A' },
+                            co2BarStyle
+                          ]} 
+                        />
+                      </View>
+                    </View>
+                  </View>
                 </View>
-                <View style={styles.alternativeItem}>
-                  <Ionicons 
-                    name="arrow-forward-circle-outline" 
-                    size={18} 
-                    color={isDark ? theme.accent : theme.warning} 
-                    style={styles.bulletIcon} 
-                  />
-                  <Text style={[styles.alternativeText, { 
-                    color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                
+                {/* Water Impact */}
+                <View style={styles.impactRow}>
+                  <View style={[styles.impactIconContainer, {
+                    backgroundColor: isDark ? 'rgba(100, 181, 246, 0.15)' : 'rgba(30, 136, 229, 0.1)'
                   }]}>
-                    Look for brands with recyclable alternatives
-                  </Text>
+                    <Ionicons name="water-outline" size={22} color={isDark ? '#64B5F6' : '#3182CE'} />
+                  </View>
+                  <View style={styles.impactDetails}>
+                    <View style={styles.impactLabelRow}>
+                      <Text style={[styles.impactLabel, { 
+                        color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)' 
+                      }]}>
+                        Water Saved
+                      </Text>
+                      <Text style={[styles.impactValue, { 
+                        color: isDark ? '#64B5F6' : '#3182CE' 
+                      }]}>
+                        {localResult.impact.waterSaved}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.progressContainer}>
+                      <View style={[styles.progressBg, { 
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' 
+                      }]}>
+                        <Animated.View 
+                          style={[
+                            styles.progressFill, 
+                            { backgroundColor: isDark ? '#64B5F6' : '#3182CE' },
+                            waterBarStyle
+                          ]} 
+                        />
+                      </View>
+                    </View>
+                  </View>
                 </View>
-                <View style={styles.alternativeItem}>
-                  <Ionicons 
-                    name="arrow-forward-circle-outline" 
-                    size={18} 
-                    color={isDark ? theme.accent : theme.warning} 
-                    style={styles.bulletIcon} 
-                  />
-                  <Text style={[styles.alternativeText, { 
-                    color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                
+                {/* Equivalent Impact */}
+                <View style={[styles.equivalentBox, {
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                }]}>
+                  <Text style={[styles.equivalentLabel, { 
+                    color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' 
                   }]}>
-                    Consider reusing the item if possible
+                    Equivalent to:
+                  </Text>
+                  <Text style={[styles.equivalentText, { 
+                    color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)' 
+                  }]}>
+                    {localResult.category.toLowerCase() === 'plastic' ? 'Not using 3 plastic bottles' : 
+                    localResult.category.toLowerCase() === 'metal' ? 'Driving 2 miles less in a car' : 
+                    localResult.category.toLowerCase() === 'glass' ? 'Saving 5 minutes of shower water' : 
+                    'Conserving natural resources'}
                   </Text>
                 </View>
               </View>
-            </View>
-          )}
-          
-          {/* Tips Card */}
-          <View style={[styles.card, { 
-            backgroundColor: isDark ? theme.backgroundCard : '#FFFFFF',
-            marginBottom: 30
-          }]}>
-            <Text style={[styles.cardTitle, { 
-              color: isDark ? '#ffffff' : '#000000' 
+            )}
+            
+            {/* Alternative Options - if not recyclable */}
+            {!localResult.recyclable && (
+              <View style={[styles.card, { 
+                backgroundColor: isDark ? theme.backgroundCard : '#FFFFFF',
+              }]}>
+                <Text style={[styles.cardTitle, { 
+                  color: isDark ? '#ffffff' : '#000000' 
+                }]}>
+                  Alternative Options
+                </Text>
+                <Text style={[styles.cardText, { 
+                  color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)' 
+                }]}>
+                  Instead of throwing this in the regular trash, consider:
+                </Text>
+                <View style={styles.alternativesList}>
+                  {localResult.alternativeOptions ? (
+                    localResult.alternativeOptions.map((item, index) => (
+                      <View key={index} style={styles.alternativeItem}>
+                        <Ionicons 
+                          name="arrow-forward-circle-outline" 
+                          size={18} 
+                          color={isDark ? theme.accent : theme.warning} 
+                          style={styles.bulletIcon} 
+                        />
+                        <Text style={[styles.alternativeText, { 
+                          color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                        }]}>
+                          {item.option}
+                        </Text>
+                      </View>
+                    ))
+                  ) : (
+                    <>
+                      <View style={styles.alternativeItem}>
+                        <Ionicons 
+                          name="arrow-forward-circle-outline" 
+                          size={18} 
+                          color={isDark ? theme.accent : theme.warning} 
+                          style={styles.bulletIcon} 
+                        />
+                        <Text style={[styles.alternativeText, { 
+                          color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                        }]}>
+                          Check local special waste disposal options
+                        </Text>
+                      </View>
+                      <View style={styles.alternativeItem}>
+                        <Ionicons 
+                          name="arrow-forward-circle-outline" 
+                          size={18} 
+                          color={isDark ? theme.accent : theme.warning} 
+                          style={styles.bulletIcon} 
+                        />
+                        <Text style={[styles.alternativeText, { 
+                          color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                        }]}>
+                          Look for brands with recyclable alternatives
+                        </Text>
+                      </View>
+                      <View style={styles.alternativeItem}>
+                        <Ionicons 
+                          name="arrow-forward-circle-outline" 
+                          size={18} 
+                          color={isDark ? theme.accent : theme.warning} 
+                          style={styles.bulletIcon} 
+                        />
+                        <Text style={[styles.alternativeText, { 
+                          color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                        }]}>
+                          Consider reusing the item if possible
+                        </Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+              </View>
+            )}
+            
+            {/* Tips Card */}
+            <View style={[styles.card, { 
+              backgroundColor: isDark ? theme.backgroundCard : '#FFFFFF',
+              marginBottom: 30
             }]}>
-              Recycling Tips
-            </Text>
-            <View style={styles.tipsContainer}>
-              <View style={styles.tipItem}>
-                <MaterialCommunityIcons 
-                  name="lightbulb-outline" 
-                  size={18} 
-                  color={isDark ? theme.accent : theme.accent} 
-                  style={styles.tipIcon}
-                />
-                <Text style={[styles.tipText, { 
-                  color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
-                }]}>
-                  Always rinse containers before recycling
-                </Text>
-              </View>
-              <View style={styles.tipItem}>
-                <MaterialCommunityIcons 
-                  name="lightbulb-outline" 
-                  size={18} 
-                  color={isDark ? theme.accent : theme.accent} 
-                  style={styles.tipIcon}
-                />
-                <Text style={[styles.tipText, { 
-                  color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
-                }]}>
-                  Check the recycling number on plastic items
-                </Text>
-              </View>
-              <View style={styles.tipItem}>
-                <MaterialCommunityIcons 
-                  name="lightbulb-outline" 
-                  size={18} 
-                  color={isDark ? theme.accent : theme.accent} 
-                  style={styles.tipIcon}
-                />
-                <Text style={[styles.tipText, { 
-                  color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
-                }]}>
-                  Remove caps and labels when required by local guidelines
-                </Text>
+              <Text style={[styles.cardTitle, { 
+                color: isDark ? '#ffffff' : '#000000' 
+              }]}>
+                Recycling Tips
+              </Text>
+              <View style={styles.tipsContainer}>
+                {localResult.recyclingTips ? (
+                  localResult.recyclingTips.map((item, index) => (
+                    <View key={index} style={styles.tipItem}>
+                      <MaterialCommunityIcons 
+                        name="lightbulb-outline" 
+                        size={18} 
+                        color={isDark ? theme.accent : theme.accent} 
+                        style={styles.tipIcon}
+                      />
+                      <Text style={[styles.tipText, { 
+                        color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                      }]}>
+                        {item.tip}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <>
+                    <View style={styles.tipItem}>
+                      <MaterialCommunityIcons 
+                        name="lightbulb-outline" 
+                        size={18} 
+                        color={isDark ? theme.accent : theme.accent} 
+                        style={styles.tipIcon}
+                      />
+                      <Text style={[styles.tipText, { 
+                        color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                      }]}>
+                        Always rinse containers before recycling
+                      </Text>
+                    </View>
+                    <View style={styles.tipItem}>
+                      <MaterialCommunityIcons 
+                        name="lightbulb-outline" 
+                        size={18} 
+                        color={isDark ? theme.accent : theme.accent} 
+                        style={styles.tipIcon}
+                      />
+                      <Text style={[styles.tipText, { 
+                        color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                      }]}>
+                        Check the recycling number on plastic items
+                      </Text>
+                    </View>
+                    <View style={styles.tipItem}>
+                      <MaterialCommunityIcons 
+                        name="lightbulb-outline" 
+                        size={18} 
+                        color={isDark ? theme.accent : theme.accent} 
+                        style={styles.tipIcon}
+                      />
+                      <Text style={[styles.tipText, { 
+                        color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                      }]}>
+                        Remove caps and labels when required by local guidelines
+                      </Text>
+                    </View>
+                  </>
+                )}
               </View>
             </View>
-          </View>
 
-          {/* Recycling Locations Button */}
-          {renderRecyclingButton()}
-          
-          {/* Extra space at bottom */}
-          <View style={{ height: 20 }} />
-        </ScrollView>
-      </Animated.View>
-    </PanGestureHandler>
+            {/* Recycling Locations Button */}
+            {renderRecyclingButton()}
+            
+            {/* Extra space at bottom */}
+            <View style={{ height: 20 }} />
+          </ScrollView>
+        </Animated.View>
+      </PanGestureHandler>
+    </Animated.View>
   );
 };
 
@@ -949,6 +1007,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 10,
+  },
+  debugContainer: {
+    padding: 10,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  debugText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });
 

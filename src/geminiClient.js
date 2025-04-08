@@ -40,14 +40,22 @@ const API_BASE_URL = 'http://192.168.142.85:8000'; // Your computer's local IP a
  */
 export const analyzeImage = async (imageUri) => {
   try {
-    // If Gemini API server isn't running yet, use mock data
-    const useMockData = false; // Set to false when your server is ready
+    // Try to check if the API server is available first
+    let useMockData = true; // Default to using mock data for safety
+    
+    try {
+      const isServerAvailable = await checkApiHealth();
+      useMockData = !isServerAvailable;
+    } catch (error) {
+      console.log('Error checking API health, falling back to mock data');
+      useMockData = true;
+    }
     
     if (useMockData) {
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      console.log("Analyzing image URI:", imageUri);
+      console.log("Using mock data for image analysis:", imageUri);
       
       // For demonstration purposes - dynamically assign mock results
       // In a real app, this would come from the Gemini API

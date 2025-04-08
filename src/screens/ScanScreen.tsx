@@ -281,8 +281,18 @@ const ScanScreen: React.FC = () => {
   const processScan = async (imageUri: string) => {
     setScanning(true);
     try {
+      // Log the image URI for debugging
+      console.log('Processing image with URI:', imageUri);
+      
       // Send image to Gemini API for analysis
       const result = await geminiClient.analyzeImage(imageUri);
+      
+      // Make sure scannedImageUrl is set in the result
+      if (!result.scannedImageUrl) {
+        result.scannedImageUrl = imageUri;
+      }
+      
+      console.log('Scan result with image:', result.scannedImageUrl);
       
       // Update user data if recyclable
       if (result.recyclable) {
