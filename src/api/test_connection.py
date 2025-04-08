@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 # API URL (should match what's in your geminiClient.js)
-SERVER_URL = "http://192.168.53.66:8000"
+SERVER_URL = "http://localhost:8000"
 
 def check_health():
     """Test the health endpoint."""

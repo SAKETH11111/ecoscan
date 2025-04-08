@@ -22,7 +22,6 @@ import { useHapticFeedback, useReanimatedScale } from '../hooks/useAnimations';
 import { useAppContext } from '../context/AppContext';
 // @ts-ignore
 import { useNavigation } from '@react-navigation/native';
-import TestImage from './TestImage';
 
 const { width } = Dimensions.get('window');
 
@@ -40,8 +39,6 @@ interface ScanResult {
   scannedImageUrl?: string;
   isMockData?: boolean;
   errorDetails?: string;
-  alternativeOptions?: Array<{option: string}>;
-  recyclingTips?: Array<{tip: string}>;
 }
 
 interface ScanResultCardProps {
@@ -387,25 +384,15 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
 
             {/* Image Card */}
             {localResult.scannedImageUrl && (
-              <>
-                <View style={[styles.imageCard, { 
-                  backgroundColor: isDark ? theme.backgroundCard : '#FFFFFF',
-                }]}>
-                  <Image 
-                    source={{ uri: localResult.scannedImageUrl }}
-                    style={styles.scannedImage}
-                    resizeMode="cover"
-                    onLoad={() => console.log('Image loaded successfully')}
-                    onError={(error) => console.error('Image load error:', error.nativeEvent.error)}
-                  />
-                </View>
-                {/* Debug Text */}
-                <View style={styles.debugContainer}>
-                  <Text style={[styles.debugText, { color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }]}>
-                    Image URI: {localResult.scannedImageUrl.substring(0, 50)}...
-                  </Text>
-                </View>
-              </>
+              <View style={[styles.imageCard, { 
+                backgroundColor: isDark ? theme.backgroundCard : '#FFFFFF',
+              }]}>
+                <Image 
+                  source={{ uri: localResult.scannedImageUrl }}
+                  style={styles.scannedImage}
+                  resizeMode="cover"
+                />
+              </View>
             )}
             
             {/* Instructions Section */}
@@ -546,65 +533,45 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
                   Instead of throwing this in the regular trash, consider:
                 </Text>
                 <View style={styles.alternativesList}>
-                  {localResult.alternativeOptions ? (
-                    localResult.alternativeOptions.map((item, index) => (
-                      <View key={index} style={styles.alternativeItem}>
-                        <Ionicons 
-                          name="arrow-forward-circle-outline" 
-                          size={18} 
-                          color={isDark ? theme.accent : theme.warning} 
-                          style={styles.bulletIcon} 
-                        />
-                        <Text style={[styles.alternativeText, { 
-                          color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
-                        }]}>
-                          {item.option}
-                        </Text>
-                      </View>
-                    ))
-                  ) : (
-                    <>
-                      <View style={styles.alternativeItem}>
-                        <Ionicons 
-                          name="arrow-forward-circle-outline" 
-                          size={18} 
-                          color={isDark ? theme.accent : theme.warning} 
-                          style={styles.bulletIcon} 
-                        />
-                        <Text style={[styles.alternativeText, { 
-                          color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
-                        }]}>
-                          Check local special waste disposal options
-                        </Text>
-                      </View>
-                      <View style={styles.alternativeItem}>
-                        <Ionicons 
-                          name="arrow-forward-circle-outline" 
-                          size={18} 
-                          color={isDark ? theme.accent : theme.warning} 
-                          style={styles.bulletIcon} 
-                        />
-                        <Text style={[styles.alternativeText, { 
-                          color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
-                        }]}>
-                          Look for brands with recyclable alternatives
-                        </Text>
-                      </View>
-                      <View style={styles.alternativeItem}>
-                        <Ionicons 
-                          name="arrow-forward-circle-outline" 
-                          size={18} 
-                          color={isDark ? theme.accent : theme.warning} 
-                          style={styles.bulletIcon} 
-                        />
-                        <Text style={[styles.alternativeText, { 
-                          color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
-                        }]}>
-                          Consider reusing the item if possible
-                        </Text>
-                      </View>
-                    </>
-                  )}
+                  <View style={styles.alternativeItem}>
+                    <Ionicons 
+                      name="arrow-forward-circle-outline" 
+                      size={18} 
+                      color={isDark ? theme.accent : theme.warning} 
+                      style={styles.bulletIcon} 
+                    />
+                    <Text style={[styles.alternativeText, { 
+                      color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                    }]}>
+                      Check local special waste disposal options
+                    </Text>
+                  </View>
+                  <View style={styles.alternativeItem}>
+                    <Ionicons 
+                      name="arrow-forward-circle-outline" 
+                      size={18} 
+                      color={isDark ? theme.accent : theme.warning} 
+                      style={styles.bulletIcon} 
+                    />
+                    <Text style={[styles.alternativeText, { 
+                      color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                    }]}>
+                      Look for brands with recyclable alternatives
+                    </Text>
+                  </View>
+                  <View style={styles.alternativeItem}>
+                    <Ionicons 
+                      name="arrow-forward-circle-outline" 
+                      size={18} 
+                      color={isDark ? theme.accent : theme.warning} 
+                      style={styles.bulletIcon} 
+                    />
+                    <Text style={[styles.alternativeText, { 
+                      color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                    }]}>
+                      Consider reusing the item if possible
+                    </Text>
+                  </View>
                 </View>
               </View>
             )}
@@ -620,65 +587,45 @@ const ScanResultCard: React.FC<ScanResultCardProps> = ({ result, onClose }) => {
                 Recycling Tips
               </Text>
               <View style={styles.tipsContainer}>
-                {localResult.recyclingTips ? (
-                  localResult.recyclingTips.map((item, index) => (
-                    <View key={index} style={styles.tipItem}>
-                      <MaterialCommunityIcons 
-                        name="lightbulb-outline" 
-                        size={18} 
-                        color={isDark ? theme.accent : theme.accent} 
-                        style={styles.tipIcon}
-                      />
-                      <Text style={[styles.tipText, { 
-                        color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
-                      }]}>
-                        {item.tip}
-                      </Text>
-                    </View>
-                  ))
-                ) : (
-                  <>
-                    <View style={styles.tipItem}>
-                      <MaterialCommunityIcons 
-                        name="lightbulb-outline" 
-                        size={18} 
-                        color={isDark ? theme.accent : theme.accent} 
-                        style={styles.tipIcon}
-                      />
-                      <Text style={[styles.tipText, { 
-                        color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
-                      }]}>
-                        Always rinse containers before recycling
-                      </Text>
-                    </View>
-                    <View style={styles.tipItem}>
-                      <MaterialCommunityIcons 
-                        name="lightbulb-outline" 
-                        size={18} 
-                        color={isDark ? theme.accent : theme.accent} 
-                        style={styles.tipIcon}
-                      />
-                      <Text style={[styles.tipText, { 
-                        color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
-                      }]}>
-                        Check the recycling number on plastic items
-                      </Text>
-                    </View>
-                    <View style={styles.tipItem}>
-                      <MaterialCommunityIcons 
-                        name="lightbulb-outline" 
-                        size={18} 
-                        color={isDark ? theme.accent : theme.accent} 
-                        style={styles.tipIcon}
-                      />
-                      <Text style={[styles.tipText, { 
-                        color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
-                      }]}>
-                        Remove caps and labels when required by local guidelines
-                      </Text>
-                    </View>
-                  </>
-                )}
+                <View style={styles.tipItem}>
+                  <MaterialCommunityIcons 
+                    name="lightbulb-outline" 
+                    size={18} 
+                    color={isDark ? theme.accent : theme.accent} 
+                    style={styles.tipIcon}
+                  />
+                  <Text style={[styles.tipText, { 
+                    color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                  }]}>
+                    Always rinse containers before recycling
+                  </Text>
+                </View>
+                <View style={styles.tipItem}>
+                  <MaterialCommunityIcons 
+                    name="lightbulb-outline" 
+                    size={18} 
+                    color={isDark ? theme.accent : theme.accent} 
+                    style={styles.tipIcon}
+                  />
+                  <Text style={[styles.tipText, { 
+                    color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                  }]}>
+                    Check the recycling number on plastic items
+                  </Text>
+                </View>
+                <View style={styles.tipItem}>
+                  <MaterialCommunityIcons 
+                    name="lightbulb-outline" 
+                    size={18} 
+                    color={isDark ? theme.accent : theme.accent} 
+                    style={styles.tipIcon}
+                  />
+                  <Text style={[styles.tipText, { 
+                    color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' 
+                  }]}>
+                    Remove caps and labels when required by local guidelines
+                  </Text>
+                </View>
               </View>
             </View>
 
@@ -1007,16 +954,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 10,
-  },
-  debugContainer: {
-    padding: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  debugText: {
-    fontSize: 12,
-    fontWeight: '500',
   },
 });
 

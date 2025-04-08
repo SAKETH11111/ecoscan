@@ -54,14 +54,24 @@ The integration follows a client-server architecture:
 
 ### Frontend Setup
 
-1. Update the `API_BASE_URL` in the `src/geminiClient.js` file to point to your backend server:
+1. The `API_BASE_URL` in `src/geminiClient.js` is pre-configured to use localhost for simulator testing:
    ```javascript
-   const API_BASE_URL = 'http://your-local-ip:8000';
+   const API_BASE_URL = 'http://localhost:8000'; // For simulator testing
+   ```
+   
+   For physical device testing, update to your computer's local IP address:
+   ```javascript
+   const API_BASE_URL = 'http://192.168.x.x:8000'; // Replace with your actual local IP
    ```
 
-2. Set `useMockData` to `false` in `src/geminiClient.js` when your server is running:
+2. The client automatically checks API health and falls back to mock data if needed:
    ```javascript
-   const useMockData = false; // Change this from true to false
+   try {
+     const isServerAvailable = await checkApiHealth();
+     useMockData = !isServerAvailable;
+   } catch (error) {
+     useMockData = true;
+   }
    ```
 
 3. Install React Native dependencies:
@@ -110,6 +120,30 @@ The API returns a JSON object with the following structure:
 
 2. **API Key Invalid**: Verify your Gemini API key is correct and has access to the Gemini 2.0 Flash model.
 
-3. **Network Errors**: Ensure your mobile app can reach the backend server by using the correct IP address in your `.env` file.
+3. **Network Errors**: 
+   - For simulator testing, use `localhost` as the API URL
+   - For physical device testing, use your computer's local IP address (e.g., 192.168.x.x)
+   - Ensure your device and computer are on the same network
+   - Check firewall settings that might block connections on port 8000
 
-4. **Model Limitations**: The Gemini model works best with clear, well-lit images. Poor image quality may result in less accurate analysis.
+4. **API Connection Timeouts**: The client is configured with a 2-second timeout for health checks to quickly fall back to mock data if needed.
+
+5. **Model Limitations**: The Gemini model works best with clear, well-lit images. Poor image quality may result in less accurate analysis.
+
+## Starting the Server
+
+You can use the included script to start the server:
+
+```bash
+# Make script executable (first time only)
+chmod +x scripts/start_server.sh
+
+# Run the server
+./scripts/start_server.sh
+```
+
+This script will:
+- Check for a Python virtual environment
+- Verify the .env file exists (or create one from .env.example)
+- Install required dependencies if needed
+- Start the FastAPI server on port 8000

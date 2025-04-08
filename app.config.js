@@ -15,7 +15,7 @@ export default {
       backgroundColor: "#4CAF50"
     },
     extra: {
-      GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+      GEMINI_API_KEY: process.env.EXPO_PUBLIC_GEMINI_API_KEY,
       googleMapsIos: process.env.GOOGLE_MAPS_API_KEY_IOS,
       googleMapsAndroid: process.env.GOOGLE_MAPS_API_KEY_ANDROID,
       googlePlacesApiKey: process.env.GOOGLE_PLACES_API_KEY,

@@ -95,7 +95,10 @@ export function locationAcceptsMaterial(
     'recycling_center',
     'waste_management',
     'point_of_interest',
-    'establishment'
+    'establishment',
+    'local_government_office',
+    'storage',
+    'store'
   ];
   
   // Check if any recycling-related types match
@@ -105,19 +108,42 @@ export function locationAcceptsMaterial(
   
   // Material-specific logic
   const category = scanResult.category.toLowerCase();
+  const locationName = location.name.toLowerCase();
+  const locationAddress = (location.address || '').toLowerCase();
   
-  if (category === 'electronics' || category === 'e-waste') {
-    return hasRecyclingType || 
-      location.name.toLowerCase().includes('electronic') ||
-      location.name.toLowerCase().includes('e-waste');
+  // Check if location name or address contains material-specific keywords
+  const containsMaterialKeyword = (keywords: string[]): boolean => {
+    return keywords.some(keyword => 
+      locationName.includes(keyword) || locationAddress.includes(keyword)
+    );
+  };
+  
+  // Material-specific keywords
+  const materialKeywords: Record<string, string[]> = {
+    'plastic': ['plastic', 'pet', 'hdpe', 'pp', 'pvc', 'recycling'],
+    'glass': ['glass', 'bottle', 'recycling'],
+    'paper': ['paper', 'cardboard', 'recycling'],
+    'metal': ['metal', 'aluminum', 'steel', 'copper', 'recycling'],
+    'electronics': ['electronic', 'e-waste', 'computer', 'battery', 'recycling'],
+    'hazardous': ['hazardous', 'chemical', 'toxic', 'waste', 'disposal'],
+    'battery': ['battery', 'recycling'],
+    'textile': ['textile', 'clothing', 'fabric', 'recycling'],
+    'organic': ['organic', 'compost', 'food', 'waste', 'recycling'],
+    'cardboard': ['cardboard', 'paper', 'recycling'],
+    'aluminum': ['aluminum', 'aluminium', 'can', 'recycling'],
+    'steel': ['steel', 'metal', 'recycling'],
+    'copper': ['copper', 'metal', 'recycling']
+  };
+  
+  // Check for material-specific keywords
+  if (materialKeywords[category]) {
+    return hasRecyclingType || containsMaterialKeyword(materialKeywords[category]);
   }
   
-  if (category === 'hazardous') {
-    return hasRecyclingType || 
-      location.name.toLowerCase().includes('hazardous') ||
-      location.name.toLowerCase().includes('chemical');
-  }
-  
-  // For common recyclables, most recycling centers will accept them
-  return hasRecyclingType;
+  // For unknown materials, check if it's a general recycling center
+  return hasRecyclingType || 
+    locationName.includes('recycling') || 
+    locationName.includes('recycle') ||
+    locationAddress.includes('recycling') ||
+    locationAddress.includes('recycle');
 } 

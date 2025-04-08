@@ -8,6 +8,9 @@ const GOOGLE_PLACES_API_KEY = Constants.expoConfig?.extra?.googlePlacesApiKey ||
 // Check if API key is available
 if (!GOOGLE_PLACES_API_KEY) {
   console.warn('Google Places API key is not configured. Places API functionality will not work.');
+  console.warn('Please check your .env file and app.config.js configuration.');
+} else {
+  console.log('Google Places API key is configured and available.');
 }
 
 export interface PlaceResult {
@@ -41,24 +44,60 @@ export function generateRecyclingSearchTerm(
   material: string,
   recyclingCode?: string
 ): string {
-  const baseQuery = "recycling center";
   const materialLower = material.toLowerCase();
   
+  // Define more specific search terms for better results
   switch (materialLower) {
     case "plastic":
-      return `${recyclingCode || ""} plastic ${baseQuery}`;
+      // For plastics, include the recycling code if available
+      if (recyclingCode) {
+        return `${recyclingCode} plastic recycling center`;
+      }
+      return "plastic recycling center";
+      
     case "glass":
-      return `glass ${baseQuery}`;
+      return "glass recycling center";
+      
     case "paper":
-      return `paper ${baseQuery}`;
+      return "paper recycling center";
+      
     case "metal":
-      return `metal ${baseQuery}`;
+      return "metal recycling center";
+      
     case "electronics":
-      return "e-waste recycling center";
+      return "electronics recycling e-waste";
+      
     case "hazardous":
       return "hazardous waste disposal";
+      
+    case "battery":
+      return "battery recycling center";
+      
+    case "textile":
+    case "fabric":
+    case "clothing":
+      return "textile clothing recycling";
+      
+    case "organic":
+    case "food":
+    case "compost":
+      return "compost organic waste recycling";
+      
+    case "cardboard":
+      return "cardboard recycling center";
+      
+    case "aluminum":
+      return "aluminum can recycling center";
+      
+    case "steel":
+      return "steel metal recycling center";
+      
+    case "copper":
+      return "copper metal recycling center";
+      
     default:
-      return `${materialLower} ${baseQuery}`;
+      // For unknown materials, try a more generic approach
+      return `${materialLower} recycling center`;
   }
 }
 
@@ -143,11 +182,22 @@ function createPlacesApiUrl(endpoint: string, params: Record<string, string>): s
  * Mock data for testing when API key is not available
  */
 function getMockRecyclingLocations(latitude: number, longitude: number, searchTerm: string): PlaceResult[] {
+  // Extract material type from search term
   const materialType = searchTerm.includes('plastic') ? 'plastic' :
                       searchTerm.includes('glass') ? 'glass' :
                       searchTerm.includes('paper') ? 'paper' :
-                      searchTerm.includes('metal') ? 'metal' : 'general';
+                      searchTerm.includes('metal') ? 'metal' :
+                      searchTerm.includes('electronic') ? 'electronics' :
+                      searchTerm.includes('hazardous') ? 'hazardous' :
+                      searchTerm.includes('battery') ? 'battery' :
+                      searchTerm.includes('textile') || searchTerm.includes('clothing') ? 'textile' :
+                      searchTerm.includes('organic') || searchTerm.includes('compost') ? 'organic' :
+                      searchTerm.includes('cardboard') ? 'cardboard' :
+                      searchTerm.includes('aluminum') ? 'aluminum' :
+                      searchTerm.includes('steel') ? 'steel' :
+                      searchTerm.includes('copper') ? 'copper' : 'general';
   
+  // Generate realistic mock locations based on material type
   const mockLocations: PlaceResult[] = [
     {
       id: 'mock-place-1',
@@ -173,7 +223,7 @@ function getMockRecyclingLocations(latitude: number, longitude: number, searchTe
         latitude: latitude - 0.02,
         longitude: longitude + 0.02
       },
-      types: ['recycling_center', 'establishment']
+      types: ['waste_management', 'establishment']
     },
     {
       id: 'mock-place-3',
@@ -189,6 +239,51 @@ function getMockRecyclingLocations(latitude: number, longitude: number, searchTe
       types: ['recycling_center', 'establishment']
     }
   ];
+  
+  // Add material-specific locations
+  if (materialType === 'plastic') {
+    mockLocations.push({
+      id: 'mock-place-4',
+      name: 'Plastic Bottle Recycling Facility',
+      address: '321 Recycle Road, San Francisco, CA',
+      distance: 4.3,
+      rating: 4.0,
+      openNow: true,
+      coordinates: {
+        latitude: latitude + 0.04,
+        longitude: longitude + 0.03
+      },
+      types: ['recycling_center', 'establishment']
+    });
+  } else if (materialType === 'glass') {
+    mockLocations.push({
+      id: 'mock-place-4',
+      name: 'Glass Bottle Recycling Center',
+      address: '321 Recycle Road, San Francisco, CA',
+      distance: 4.3,
+      rating: 4.0,
+      openNow: true,
+      coordinates: {
+        latitude: latitude + 0.04,
+        longitude: longitude + 0.03
+      },
+      types: ['recycling_center', 'establishment']
+    });
+  } else if (materialType === 'electronics') {
+    mockLocations.push({
+      id: 'mock-place-4',
+      name: 'E-Waste Recycling Facility',
+      address: '321 Recycle Road, San Francisco, CA',
+      distance: 4.3,
+      rating: 4.0,
+      openNow: true,
+      coordinates: {
+        latitude: latitude + 0.04,
+        longitude: longitude + 0.03
+      },
+      types: ['recycling_center', 'establishment']
+    });
+  }
   
   return mockLocations;
 }
@@ -218,6 +313,61 @@ export async function findRecyclingLocations(
       return getMockRecyclingLocations(latitude, longitude, searchTerm);
     }
     
+    // Try multiple search strategies if needed
+    let results: PlaceResult[] = [];
+    let networkError = false;
+    
+    try {
+      // Strategy 1: Use the provided search term
+      results = await searchWithStrategy(searchTerm, latitude, longitude, radius);
+      
+      // Strategy 2: If no results, try a more generic search
+      if (results.length === 0) {
+        console.log('No results found with specific search, trying more generic search...');
+        const genericSearchTerm = searchTerm.split(' ').slice(-2).join(' '); // Get last two words
+        results = await searchWithStrategy(genericSearchTerm, latitude, longitude, radius);
+      }
+      
+      // Strategy 3: If still no results, try with just "recycling center"
+      if (results.length === 0) {
+        console.log('No results found with generic search, trying with "recycling center"...');
+        results = await searchWithStrategy('recycling center', latitude, longitude, radius);
+      }
+    } catch (error) {
+      console.error('Error during Places API search:', error);
+      networkError = true;
+    }
+    
+    // If we have no results or encountered network errors, use mock data
+    if (results.length === 0 || networkError) {
+      console.warn('Using mock data for recycling locations');
+      return getMockRecyclingLocations(latitude, longitude, searchTerm);
+    }
+    
+    return results;
+  } catch (error) {
+    console.error('Error finding recycling locations:', error);
+    // Fall back to mock data in case of error
+    const userCoords = coords || { latitude: 37.7749, longitude: -122.4194 }; // Default to San Francisco
+    return getMockRecyclingLocations(userCoords.latitude, userCoords.longitude, searchTerm);
+  }
+}
+
+/**
+ * Helper function to search with a specific strategy
+ * @param searchTerm Search term to use
+ * @param latitude Latitude coordinate
+ * @param longitude Longitude coordinate
+ * @param radius Search radius in meters
+ * @returns Promise with array of PlaceResult
+ */
+async function searchWithStrategy(
+  searchTerm: string,
+  latitude: number,
+  longitude: number,
+  radius: number
+): Promise<PlaceResult[]> {
+  try {
     // Create URL for Places API
     const params = {
       location: `${latitude},${longitude}`,
@@ -228,9 +378,22 @@ export async function findRecyclingLocations(
     
     const url = createPlacesApiUrl('nearbysearch', params);
     
-    // Make the API request
+    console.log(`Making Places API request to: ${url.substring(0, 100)}...`);
+    
+    // Make the API request with a timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { 
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`Google Places API response error: ${response.status}`);
@@ -267,12 +430,19 @@ export async function findRecyclingLocations(
         },
         types: place.types,
       }));
-    } catch (error) {
-      console.error('Error calling Google Places API:', error);
-      return getMockRecyclingLocations(latitude, longitude, searchTerm);
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      throw fetchError;
     }
   } catch (error) {
-    console.error('Error finding recycling locations:', error);
+    console.error(`Error with search strategy "${searchTerm}":`, error);
+    
+    // For network errors, return an empty array to allow fallback to mock data
+    if (error instanceof TypeError && error.message.includes('Network request failed')) {
+      console.warn('Network error detected, will fall back to mock data');
+      return [];
+    }
+    
     return [];
   }
 }
